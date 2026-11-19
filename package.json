@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "notifications:discover": "tsx scripts/discover-email-routes.mts",
     "test:auth": "tsx --test tests/totp.test.ts",
-    "test:auth-flow": "tsx scripts/test-auth-flow.mts"
+    "test:auth-flow": "tsx scripts/test-auth-flow.mts",
+    "test:cv-scale": "node --max-old-space-size=256 --import tsx scripts/test-cv-scale.mts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.1.1",

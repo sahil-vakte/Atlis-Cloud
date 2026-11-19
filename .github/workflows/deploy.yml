@@ -27,6 +27,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run test:email
       - run: npm run test:auth
+      - run: npm run test:cv-scale
       - run: npm run build
       - run: git archive --format=tar.gz -o source.tar.gz HEAD
       - uses: actions/upload-artifact@v4

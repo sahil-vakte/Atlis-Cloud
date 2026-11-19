@@ -133,7 +133,7 @@ const COMMON_WORDS = new Set(['design', 'testing', 'management', 'sales', 'marke
 function makeRe(alias: string) {
   return new RegExp(`(?<![A-Za-z0-9+#])${esc(alias).replace(/\\ /g, '[\\s-]+')}(?![A-Za-z0-9+#]|[./][A-Za-z0-9])`, 'i');
 }
-function buildMatchers(extra: string[] = []): SkillMatcher[] {
+function buildMatchers(extra: string[] = [], source = ''): SkillMatcher[] {
   if (!builtinMatchers) {
     builtinMatchers = [];
     for (const [canon, aliases] of Object.entries(SKILL_ALIASES)) {
@@ -143,8 +143,12 @@ function buildMatchers(extra: string[] = []): SkillMatcher[] {
   }
   const known = new Set(Object.entries(SKILL_ALIASES).flatMap(([c, a]) => [c, ...a]).map((x) => x.toLowerCase()));
   const dbm: SkillMatcher[] = [];
+  // Production has hundreds of thousands of legacy skills. Compile only literals
+  // present in this CV, rather than JIT-compiling the entire database dictionary.
+  const lowerSource = source.toLowerCase();
   for (const s of extra) {
     const v = s.trim();
+    if (!lowerSource.includes(v.toLowerCase())) continue;
     if (v.length < 2 || v.length > 40 || /^\d+$/.test(v) || known.has(v.toLowerCase()) || /[(){}\[\]]/.test(v)) continue;
     if (/\b(developer|engineer|manager|consultant|analyst|architect|executive|specialist|officer|lead|intern|trainee|recruiter|administrator|tester)s?$/i.test(v)) continue; // job titles, not skills
     known.add(v.toLowerCase());
@@ -155,7 +159,7 @@ function buildMatchers(extra: string[] = []): SkillMatcher[] {
 }
 
 function extractSkills(text: string, skillText: string, extra: string[]): string[] {
-  const matchers = buildMatchers(extra);
+  const matchers = buildMatchers(extra, text + '\n' + skillText);
   const score = new Map<string, number>();
   const skillItems = skillText.split(/[,;|•\n]|\s\/\s|\s{3,}|\s+-\s+|\band\b/).map((x) => clean(x.replace(/^[^:]{2,40}:\s*/, ''))).filter((x) => x.length >= 1 && x.length <= 40);
   const itemSet = new Set(skillItems.map((x) => x.toLowerCase()));
@@ -448,7 +452,12 @@ export function parseCV(rawText: string, fileName = '', dict: Dictionaries = {})
   const skillSecLines = new Set(sections.filter((x) => x.key !== 'header' && x.key !== 'personal').flatMap((x) => x.lines.map((l) => l.trim())));
   const headerLines = sections.filter((x) => x.key === 'header' || x.key === 'personal').flatMap((x) => x.lines).filter((l) => l.trim());
   const nameCandidates = (headerLines.length >= 1 ? headerLines : nonEmpty).filter((l) => !skillSecLines.has(l.trim()) || headerLines.length);
-  const allSkillNames = new Set([...Object.keys(SKILL_ALIASES), ...(dict.skills || [])].map((x) => x.toLowerCase()));
+  const candidateNames = new Set(nameCandidates.map(l => clean(l).toLowerCase()));
+  const allSkillNames = new Set(Object.keys(SKILL_ALIASES).map(x => x.toLowerCase()));
+  for (const skill of dict.skills || []) {
+    const lower = skill.toLowerCase();
+    if (candidateNames.has(lower)) allSkillNames.add(lower);
+  }
   const nm = extractName(nameCandidates.filter((l) => !allSkillNames.has(clean(l).toLowerCase()) && !/,/.test(l.replace(/^[^,]{2,45}\s*\|/, ''))), emails, fileName, designations, cities);
   const nameParts = nm.name.split(/\s+/).filter(Boolean);
 
