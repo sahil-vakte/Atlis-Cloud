@@ -16,7 +16,7 @@ ln -s /etc/atlis-cloud.env .env.local
 npm ci --no-audit --no-fund
 npm run test:email
 npm run migrate
-npm run notifications:discover
+# Recipient discovery is an explicit admin action; deployments must not restore deleted mappings.
 npm run schema
 npm run build
 previous=$(readlink -f "$base/current" || true)
