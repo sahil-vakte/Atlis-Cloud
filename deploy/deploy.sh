@@ -22,12 +22,13 @@ npm run build
 previous=$(readlink -f "$base/current" || true)
 ln -s "$release" "$base/current.next"
 mv -Tf "$base/current.next" "$base/current"
-sudo /usr/bin/systemctl restart atlis-next.service
 healthy=false
-for attempt in {1..30}; do
-  if curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null; then healthy=true; break; fi
-  sleep 2
-done
+if sudo /usr/bin/systemctl restart atlis-next.service; then
+  for attempt in {1..30}; do
+    if curl --fail --silent --max-time 5 http://127.0.0.1:3000/api/health > /dev/null; then healthy=true; break; fi
+    sleep 2
+  done
+fi
 if [ "$healthy" != true ]; then
   if [ -n "$previous" ] && [ -d "$previous" ]; then
     ln -s "$previous" "$base/current.rollback"
