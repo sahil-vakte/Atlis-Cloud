@@ -1,6 +1,10 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { resolveMenuHref } from '@/lib/modules';
 import { PageHeader } from '@/components/ui';
 export default function Legacy({ params }: { params: { slug: string[] } }) {
+  const destination = resolveMenuHref(params.slug.join('/'));
+  if (!destination.startsWith('/legacy/')) redirect(destination);
   return (
     <>
       <PageHeader title="This page has moved" sub={`The old “${params.slug.join('/')}” screen is part of a module in the new app.`} />

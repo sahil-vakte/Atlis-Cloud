@@ -1,6 +1,6 @@
 # Production deployment
 
-The application is served at `http://45.10.192.154` by Nginx, which proxies to the Next.js service on `127.0.0.1:3000`.
+The application is served at `https://atlis.cloud` by Nginx, which proxies to the Next.js service on `127.0.0.1:3000`. HTTP requests and `www.atlis.cloud` redirect to the canonical HTTPS domain.
 
 - App: `/opt/atlis-next/current` (symlink to a commit-specific release)
 - Runtime: `/opt/atlis-runtime/node` (Node 22, separate from the legacy Node 14 installation)
@@ -36,4 +36,6 @@ journalctl -u atlis-next -n 100 --no-pager
 curl --fail http://127.0.0.1:3000/api/health
 ```
 
-Use a domain and HTTPS before regular use with sensitive business data. The initial IP endpoint uses HTTP as requested.
+Certificates for `atlis.cloud` and `www.atlis.cloud` are managed by Certbot. `certbot-renew.timer` renews them automatically; the deploy hook validates and reloads Nginx. HTTP ACME challenges are served from `/usr/share/nginx/html`.
+
+Notification emails also controls the sender address and display name. Legacy contact references in email templates use the same replacement rules as To/CC/BCC. AC entity codes replace the old TQ codes consistently in entity settings and reminder mappings; original email addresses are retained only as routing references.

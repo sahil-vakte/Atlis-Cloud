@@ -11,7 +11,7 @@
     "rebrand-db": "node scripts/rebrand-db.mjs",
     "test:cv": "tsx scripts/test-cv-parser.mts tests/cv-samples && tsx scripts/test-cv-parser.mts tests/cv-samples-blind",
     "migrate": "node scripts/migrate.mjs",
-    "test:email": "tsx --test tests/email-routing.test.ts",
+    "test:email": "tsx --test tests/email-routing.test.ts tests/navigation.test.ts",
     "typecheck": "tsc --noEmit",
     "notifications:discover": "tsx scripts/discover-email-routes.mts"
   },

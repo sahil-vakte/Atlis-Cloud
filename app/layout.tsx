@@ -5,6 +5,7 @@ import { getSettings } from '@/lib/settings';
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSettings();
   return {
+    metadataBase: new URL(process.env.APP_URL || 'http://localhost:3000'),
     title: { default: s.brand_name, template: `%s · ${s.brand_name}` },
     description: s.brand_tagline,
     icons: { icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }, { url: '/favicon-32x32.png', sizes: '32x32' }], apple: '/apple-touch-icon.png' },

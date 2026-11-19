@@ -4,7 +4,7 @@ import { api } from '@/lib/client';
 import { PageHeader, Spinner, useToast } from '@/components/ui';
 
 type Route = { id: number; original_email: string; replacement_email: string; purpose: string; enabled: boolean };
-type Config = { routes: Route[]; entities: { id: number; value: string; label: string }[]; support_email: string; reminder_email: string; enabled: boolean; serverAllowed: boolean; smtpConfigured: boolean };
+type Config = { routes: Route[]; entities: { id: number; value: string; label: string }[]; support_email: string; reminder_email: string; sender_email: string; sender_name: string; enabled: boolean; serverAllowed: boolean; smtpConfigured: boolean };
 export default function NotificationEmails({ readOnly }: { readOnly: boolean }) {
   const [data,setData] = useState<Config | null>(null), [error,setError] = useState(''), [busy,setBusy] = useState(false), [search,setSearch] = useState('');
   const toast = useToast();
@@ -24,6 +24,14 @@ export default function NotificationEmails({ readOnly }: { readOnly: boolean }) 
       {!data.smtpConfigured && <p className="mt-1">An SMTP server must be configured before delivery can be enabled.</p>}
     </div>
     <fieldset disabled={readOnly || busy}>
+    <section className="card mb-5 space-y-4 p-5">
+      <h2 className="font-bold text-navy">Notification sender</h2>
+      <p className="text-sm text-slate2">The From identity for application emails. Use an address authorised by your SMTP provider. This does not change SMTP credentials or send an email.</p>
+      <div className="grid gap-5 md:grid-cols-2">
+        <div><label htmlFor="sender-name" className="label">Sender display name</label><input id="sender-name" className="input" value={data.sender_name} onChange={e=>setData({...data,sender_name:e.target.value})}/></div>
+        <div><label htmlFor="sender-email" className="label">Sender email</label><input id="sender-email" type="email" className="input" placeholder="notifications@your-domain.com" value={data.sender_email} onChange={e=>setData({...data,sender_email:e.target.value})}/></div>
+      </div>
+    </section>
     <section className="card mb-5 space-y-4 p-5">
       <h2 className="font-bold text-navy">General notification inboxes</h2>
       <div className="grid gap-5 md:grid-cols-2">

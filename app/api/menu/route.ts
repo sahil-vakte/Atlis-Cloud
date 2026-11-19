@@ -1,6 +1,6 @@
 import { handler, ok } from '@/lib/api';
 import { query } from '@/lib/db';
-import { HREF_ROUTES } from '@/lib/modules';
+import { resolveMenuHref } from '@/lib/modules';
 
 /** Sidebar is built from the `permissions` table + `permission_role`, exactly like the legacy LeftMenusController. */
 export const GET = handler(async (_req, _ctx, user) => {
@@ -9,8 +9,8 @@ export const GET = handler(async (_req, _ctx, user) => {
   const allowed = (id: number) => granted.has(id);
   const seen = new Set<string>();
   const items = all.filter((p) => p.parent_id === 0 && allowed(p.id)).map((p) => ({
-    id: p.id, label: p.displayName || p.name, icon: p.icon, href: HREF_ROUTES[p.href] || `/legacy/${p.href}`,
-    children: all.filter((c) => c.parent_id === p.id && allowed(c.id)).map((c) => ({ id: c.id, label: c.displayName || c.name, href: HREF_ROUTES[c.href] || `/legacy/${c.href}` })),
+    id: p.id, label: p.displayName || p.name, icon: p.icon, href: resolveMenuHref(p.href),
+    children: all.filter((c) => c.parent_id === p.id && allowed(c.id)).map((c) => ({ id: c.id, label: c.displayName || c.name, href: resolveMenuHref(c.href) })),
   })).filter((i) => { const k = i.href + i.label; if (seen.has(k)) return false; seen.add(k); return true; });
   return ok({ items });
 });

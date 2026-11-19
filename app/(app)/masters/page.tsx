@@ -14,7 +14,7 @@ export default async function Masters() {
   for (const m of MODULES) if (await canAccess(u, m)) visible.push(m);
   return (
     <>
-      <PageHeader title="Masters & data" sub="Every list in atlis.cloud — dropdown values, reference data and all records — managed in one place. Nothing in the app is hardcoded." />
+      <PageHeader title="Masters & data" sub="Manage dropdown values, reference data and business records in one place." />
       <div className="space-y-6">
         {groups.map((g) => {
           const list = visible.filter((m) => m.group === g);

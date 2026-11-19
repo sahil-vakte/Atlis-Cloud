@@ -259,7 +259,7 @@ const companies: ModuleDef[] = [
 ];
 
 const crm: ModuleDef[] = [
-  { key: 'crm-prospects', label: 'Prospects', singular: 'Prospect', table: 'prospects', group: 'CRM', icon: 'target', perms: ['crm-account-list', 'crm-leads', 'crm-opportunities'], titleField: 'companyName', softDelete: 'deleted', defaultSort: 'id DESC', listColumns: ['id', 'companyName', 'email', 'website', 'clientAddressCity', 'clientAddressCountry', 'priority', 'progressStage', 'inPipeline', 'winLost'], searchColumns: ['companyName', 'email', 'website', 'accountSummary', 'agenda'], lookups: { region_id: 'region', serviceID: 'service', priority: 'priority', connectorID: 'opt:yesno' }, multi: ['serviceID', 'region_id'], filters: ['priority', 'progressStage', 'clientAddressCountry'], files: ['clientLogo', 'attachmentFile'], related: [{ module: 'crm-contacts', fk: 'prospectID', label: 'Contacts' }, { module: 'crm-prospect-comments', fk: 'prospectID', label: 'Comments' }, { module: 'crm-prospect-documents', fk: 'prospectID', label: 'Documents' }, { module: 'crm-connectors', fk: 'prospectId', label: 'Connectors' }] },
+  { key: 'crm-prospects', label: 'Prospects', singular: 'Prospect', table: 'prospects', group: 'CRM', icon: 'target', perms: ['crm-prospect-list', 'crm-account-list', 'crm-leads', 'crm-opportunities'], titleField: 'companyName', softDelete: 'deleted', defaultSort: 'id DESC', listColumns: ['id', 'companyName', 'email', 'website', 'clientAddressCity', 'clientAddressCountry', 'priority', 'progressStage', 'inPipeline', 'winLost'], searchColumns: ['companyName', 'email', 'website', 'accountSummary', 'agenda'], lookups: { region_id: 'region', serviceID: 'service', priority: 'priority', connectorID: 'opt:yesno' }, multi: ['serviceID', 'region_id'], filters: ['priority', 'progressStage', 'clientAddressCountry'], files: ['clientLogo', 'attachmentFile'], related: [{ module: 'crm-contacts', fk: 'prospectID', label: 'Contacts' }, { module: 'crm-prospect-comments', fk: 'prospectID', label: 'Comments' }, { module: 'crm-prospect-documents', fk: 'prospectID', label: 'Documents' }, { module: 'crm-connectors', fk: 'prospectId', label: 'Connectors' }] },
   { key: 'crm-contacts', label: 'Prospect contacts', singular: 'Contact', table: 'prospects_contact', group: 'CRM', icon: 'contact-round', perms: ['crm-account-list', 'crm-contacts'], titleField: 'firstName', softDelete: 'deleted', defaultSort: 'prospectContactID DESC', listColumns: ['prospectContactID', 'firstName', 'lastName', 'designation', 'email', 'phoneNo', 'prospectID', 'country'], searchColumns: ['firstName', 'lastName', 'email', 'designation'], lookups: { prospectID: 'prospect' }, filters: ['prospectID'], related: [{ module: 'crm-contact-comments', fk: 'prospectContactID', label: 'Comments' }] },
   { key: 'crm-prospect-comments', label: 'Prospect comments', singular: 'Comment', table: 'prospect_comment', group: 'CRM', perms: ['crm-account-list'], titleField: 'comment', softDelete: 'deleted', listColumns: ['prospectCommentID', 'prospectID', 'comment', 'userID', 'created_at'], searchColumns: ['comment'], lookups: { prospectID: 'prospect', userID: 'user' }, files: ['attachment'] },
   { key: 'crm-contact-comments', label: 'Contact comments', singular: 'Comment', table: 'prospect_contact_comment', group: 'CRM', perms: ['crm-account-list'], titleField: 'comment', softDelete: 'deleted', listColumns: ['prospectContactCommentId', 'prospectContactID', 'comment', 'userID', 'created_at'], searchColumns: ['comment'], lookups: { prospectContactID: 'prospectContact', prospectID: 'prospect', userID: 'user' }, files: ['attachment'] },
@@ -358,7 +358,7 @@ const masters: ModuleDef[] = simpleMasters.map(([key, label, table, titleField, 
   filters: table === 'app_options' ? ['group_key'] : Object.keys(lk || {}).slice(0, 3),
 }));
 
-export const MODULES: ModuleDef[] = [...recruitment, ...psCare, ...companies, ...crm, ...content, ...admin, ...masters];
+export const MODULES: ModuleDef[] = [...recruitment, ...psCare, ...companies, ...crm, ...content, ...admin, ...masters].filter(m => !!__schema[m.table]);
 
 // Columns that always point at a user, wherever they appear, get a user lookup automatically
 import { schema as __schema } from './schema';
@@ -381,8 +381,19 @@ export const HREF_ROUTES: Record<string, string> = {
   'umbrella-invoice': '/m/invoices', 'ownCompany-invoice': '/m/invoices', 'sub-vendor-invoice': '/m/invoices',
   'my-expenses': '/m/expenses', 'candidate-my-profile': '/me', vendormaster: '/m/vendors', 'knowledge-base': '/m/knowledge-base',
   'crm-account-list': '/m/crm-prospects', 'crm-contacts': '/m/crm-contacts', 'crm-opportunities': '/m/crm-prospects', 'crm-leads': '/m/crm-prospects',
+  'crm-prospect-list': '/m/crm-prospects',
   'new-updates': '/m/updates', 'version-history': '/m/versions', psMaster: '/masters', 'recruiter-report': '/reports', 'technology-profiles-report': '/reports/technology',
   'activity-log': '/m/activity-log', HelpIndex: '/help', 'submission-logs': '/m/client-submission-logs', 'cv-parser': '/cv-parser', users: '/m/users', roles: '/roles',
   settings: '/settings', 'task-tracker': '/m/task-tracker', 'email-templates': '/m/email-templates', 'vendor-documents': '/m/sub-vendor-documents', 'vendor-finance': '/m/vendor-financials',
   'vendor-opportunities': '/m/requirements', 'vendor-contact': '/m/contracts', 'my-company': '/m/companies',
 };
+
+/** Accept old slugs and already-configured local application paths. */
+export function resolveMenuHref(href: string | null | undefined) {
+  const raw = String(href || '').trim();
+  const slug = raw.replace(/^\/+/, '').replace(/^legacy\//, '');
+  if (HREF_ROUTES[slug]) return HREF_ROUTES[slug];
+  if (MODULE_MAP[slug]) return `/m/${slug}`;
+  if (/^\/(?!\/)(?:m\/|admin\/|dashboard(?:$|\?)|masters(?:$|\?)|roles(?:$|\?)|settings(?:$|\?)|reports(?:\/|$|\?))/.test(raw)) return raw;
+  return `/legacy/${encodeURIComponent(slug || 'unknown')}`;
+}

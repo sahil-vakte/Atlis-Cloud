@@ -1,29 +1,34 @@
 import nodemailer from 'nodemailer';
 import { one, query } from './db';
 import { getSettings, type Settings } from './settings';
-import { routeRecipients, type EmailRoute } from './email-routing';
+import { emailList, legacyEmail, routeRecipients, routeEmailReferences, type EmailRoute } from './email-routing';
 
 /** SMTP comes from .env, or from the `email_settings` table row of the given type (managed in Administration → SMTP settings). */
-async function transport(type?: string) {
+async function transport(settings: Settings, type?: string) {
+  const configured = settings.notification_sender_email ?? ((process.env.SMTP_FROM || '').match(/<([^<>]+)>/)?.[1] || process.env.SMTP_FROM || '');
+  const senders = emailList(configured);
+  if (senders.length !== 1 || legacyEmail(senders[0])) return null;
+  const from = { name: settings.notification_sender_name || settings.brand_name, address: senders[0] };
   if (type) {
     const row = await one<any>('SELECT * FROM email_settings WHERE type=? LIMIT 1', [type]);
-    if (row?.smtp_host) return { t: nodemailer.createTransport({ host: row.smtp_host, port: 587, auth: { user: row.smtp_username, pass: row.smtp_password } }), from: `${row.smtp_title || 'atlis.cloud'} <${row.smtp_username}>` };
+    if (row?.smtp_host) return { t: nodemailer.createTransport({ host: row.smtp_host, port: 587, auth: { user: row.smtp_username, pass: row.smtp_password } }), from };
   }
   if (!process.env.SMTP_HOST) return null;
   return {
     t: nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined }),
-    from: process.env.SMTP_FROM || 'atlis.cloud <no-reply@atlis.cloud>',
+    from,
   };
 }
 export async function sendMail(o: { to: string; cc?: string; bcc?: string; subject: string; html: string; smtpType?: string; attachments?: any[] }) {
   if (process.env.EMAIL_DELIVERY_ENABLED !== 'true') return { sent: false };
-  if ((await getSettings()).email_delivery_enabled !== '1') return { sent: false };
+  const settings = await getSettings();
+  if (settings.email_delivery_enabled !== '1') return { sent: false };
   const routes = await query<EmailRoute>('SELECT original_email,replacement_email,enabled FROM app_email_routes');
   const to = routeRecipients(o.to, routes), cc = routeRecipients(o.cc, routes), bcc = routeRecipients(o.bcc, routes);
   if (!to) return { sent: false };
-  const tr = await transport(o.smtpType);
+  const tr = await transport(settings, o.smtpType);
   if (!tr) { console.warn('[mail] SMTP not configured — email not sent:', o.subject, '→', o.to); return { sent: false }; }
-  await tr.t.sendMail({ from: tr.from, to, cc: cc || undefined, bcc: bcc || undefined, subject: o.subject, html: o.html, attachments: o.attachments });
+  await tr.t.sendMail({ from: tr.from, to, cc: cc || undefined, bcc: bcc || undefined, subject: routeEmailReferences(o.subject, routes), html: routeEmailReferences(o.html, routes, true), attachments: o.attachments });
   return { sent: true };
 }
 export function renderBrandedEmail(s: Settings, body: string) {

@@ -10,6 +10,7 @@ export const GET = handler(async (_req, _ctx, user) => {
   return ok({ routes: await query('SELECT * FROM app_email_routes ORDER BY original_email'),
     entities: await query("SELECT id,value,label FROM app_options WHERE group_key='entity_reminder_email' AND deleted=0 ORDER BY sort_order"),
     support_email: settings.support_email || '', reminder_email: settings.reminder_email || '',
+    sender_email: settings.notification_sender_email || '', sender_name: settings.notification_sender_name || settings.brand_name,
     enabled: settings.email_delivery_enabled === '1', serverAllowed: process.env.EMAIL_DELIVERY_ENABLED === 'true', smtpConfigured: !!process.env.SMTP_HOST });
 });
 export const POST = handler(async (_req, _ctx, user) => {
@@ -28,6 +29,10 @@ export const PUT = handler(async (req, _ctx, user) => {
       return emails.join(',');
     };
     const support = validate(body.support_email), reminder = validate(body.reminder_email);
+    const sender = validate(body.sender_email);
+    if (emailList(sender).length > 1) throw new Error('Choose one sender email address.');
+    if (typeof body.sender_name !== 'string' || body.sender_name.length > 100 || /[\r\n]/.test(body.sender_name)) throw new Error('Enter a sender display name of up to 100 characters.');
+    if (body.enabled && !sender) throw new Error('Configure a sender address before enabling delivery.');
     const routes = body.routes.map((r: any) => {
       if (!Number.isInteger(r.id) || typeof r.enabled !== 'boolean') throw new Error('Invalid recipient row.');
       const replacement = validate(r.replacement_email);
@@ -45,7 +50,7 @@ export const PUT = handler(async (req, _ctx, user) => {
       await db.beginTransaction();
       for (const r of routes) await db.query('UPDATE app_email_routes SET replacement_email=?, enabled=?, updated_by=? WHERE id=?', [r.replacement_email, r.enabled ? 1 : 0, user.id, r.id]);
       for (const e of entities) await db.query("UPDATE app_options SET label=? WHERE id=? AND group_key='entity_reminder_email'", [e.label, e.id]);
-      for (const [k,v] of [['support_email',support],['reminder_email',reminder],['email_delivery_enabled',body.enabled ? '1' : '0']]) await db.query('INSERT INTO app_settings (setting_key,setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)', [k,v]);
+      for (const [k,v] of [['support_email',support],['reminder_email',reminder],['notification_sender_email',sender],['notification_sender_name',body.sender_name.trim()],['email_delivery_enabled',body.enabled ? '1' : '0']]) await db.query('INSERT INTO app_settings (setting_key,setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)', [k,v]);
       await db.commit();
     } catch (e) { await db.rollback(); throw e; } finally { db.release(); }
     clearSettingsCache();

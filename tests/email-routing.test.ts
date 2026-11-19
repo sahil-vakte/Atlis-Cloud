@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { emailList, routeRecipients } from '../lib/email-routing';
+import { emailList, routeRecipients, routeEmailReferences } from '../lib/email-routing';
 test('legacy destinations are blocked even without a configured route', () => {
   assert.equal(routeRecipients('owner@example.com,old@testqtech.com,old@decilliondigital.com,old@virguleinternational.com', []), 'owner@example.com');
 });
@@ -15,4 +15,10 @@ test('invalid destinations, header injection and legacy replacements are rejecte
   assert.throws(()=>emailList('valid@example.com\r\nBcc: other@example.com'));
   assert.throws(()=>emailList('not-an-email'));
   assert.throws(()=>routeRecipients('old@testqtech.com',[{original_email:'old@testqtech.com',replacement_email:'other@testqtech.com',enabled:true}]));
+});
+test('legacy template contact references use enabled replacements and suppress unconfigured addresses', () => {
+  const routes = [{original_email:'old@testqtech.com',replacement_email:'care@example.com',enabled:true}];
+  assert.equal(routeEmailReferences('<a href="mailto:old@testqtech.com">old@testqtech.com</a>',routes,true),'<a href="mailto:care@example.com">care@example.com</a>');
+  assert.equal(routeEmailReferences('Contact old@decilliondigital.com',[]),'Contact ');
+  assert.equal(routeEmailReferences('Contact current@example.com',[]),'Contact current@example.com');
 });

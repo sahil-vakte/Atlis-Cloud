@@ -13,6 +13,9 @@ export async function discoverNotificationRoutes() {
     ['contact','email','Contact: selected client submissions'],
     ['master_poc','primaryEmail','Client contact: selected client submissions'],
     ['email_settings','smtp_username','Legacy SMTP sender identity; configure your own SMTP account separately'],
+    ['email_template','email_template_from_mail','Legacy email-template sender identity; configure the Notification sender separately'],
+    ['email_template','email_template_html','Email-template contact reference or signature'],
+    ['pscare_email_template','description','PS Care email-template contact reference or signature'],
   ];
   const found = new Map<string, Set<string>>();
   for (const [table, column, purpose] of sources) {

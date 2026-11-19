@@ -21,3 +21,12 @@ export function routeRecipients(value: string | undefined, routes: EmailRoute[])
   }
   return [...new Set(result)].join(',');
 }
+
+/** Template contact references follow the same replacements as envelope recipients. */
+export function routeEmailReferences(value: string, routes: EmailRoute[], html = false) {
+  return value.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, email => {
+    if (!legacyEmail(email) && !routes.some(r => r.original_email.toLowerCase() === email.toLowerCase())) return email;
+    const replacement = routeRecipients(email, routes);
+    return html ? replacement.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') : replacement;
+  });
+}
