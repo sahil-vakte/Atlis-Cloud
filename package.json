@@ -1,0 +1,53 @@
+{
+  "name": "atlis-cloud",
+  "version": "1.0.0",
+  "private": true,
+  "description": "atlis.cloud \u2014 recruitment, workforce and PS Care platform (Next.js)",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "schema": "node scripts/generate-schema.mjs",
+    "rebrand-db": "node scripts/rebrand-db.mjs",
+    "test:cv": "tsx scripts/test-cv-parser.mts tests/cv-samples && tsx scripts/test-cv-parser.mts tests/cv-samples-blind",
+    "migrate": "node scripts/migrate.mjs"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.1.1",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "exceljs": "^4.4.0",
+    "jose": "^6.2.18",
+    "jszip": "^3.10.2",
+    "libphonenumber-js": "^1.13.17",
+    "lucide-react": "^1.76.0",
+    "mammoth": "^1.13.0",
+    "mysql2": "^3.24.6",
+    "next": "^14.2.15",
+    "nodemailer": "^10.6.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^3.11.0",
+    "tesseract.js": "^7.0.0",
+    "unpdf": "^1.9.1",
+    "word-extractor": "^1.0.4",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^26.6.6",
+    "@types/nodemailer": "^8.0.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.6.2",
+    "postcss": "^8.5.33",
+    "tailwindcss": "^3.4.14",
+    "tsx": "^4.23.15",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18.18"
+  }
+}

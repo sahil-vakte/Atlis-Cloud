@@ -1,0 +1,32 @@
+services:
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: atlis
+      MARIADB_USER: atlis
+      MARIADB_PASSWORD: change-me
+      MARIADB_ROOT_PASSWORD: change-me-root
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./database/atlis_cloud.sql:/docker-entrypoint-initdb.d/01-atlis.sql:ro
+    restart: unless-stopped
+  app:
+    build: .
+    depends_on: [db]
+    ports: ["3000:3000"]
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: atlis
+      DB_PASSWORD: change-me
+      DB_NAME: atlis
+      JWT_SECRET: change-me-to-a-long-random-string
+      APP_URL: http://localhost:3000
+      CRON_SECRET: change-me-too
+    volumes:
+      - uploads:/app/storage/uploads
+      # - /path/to/old/laravel/public/uploads:/app/storage/legacy-uploads:ro
+    restart: unless-stopped
+volumes:
+  dbdata:
+  uploads:

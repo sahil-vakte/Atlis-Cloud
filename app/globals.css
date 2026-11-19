@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --navy: #00297B; --slate: #576E9A; --teal: #01E2C1; --light-slate: #B3C0DB; --bg: #F4F6FB; }
+html, body { background: var(--bg); color: #0B1B3F; -webkit-font-smoothing: antialiased; }
+* { scrollbar-width: thin; scrollbar-color: #C9D3E6 transparent; }
+
+@layer components {
+  .card { @apply bg-white rounded-2xl shadow-card border border-[#E6EBF4]; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-teal disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap; }
+  .btn-primary { @apply btn bg-navy text-white hover:bg-navy-700; }
+  .btn-accent { @apply btn bg-teal text-navy-900 hover:bg-teal-600; }
+  .btn-ghost { @apply btn text-navy hover:bg-navy-50; }
+  .btn-outline { @apply btn border border-[#D6DFF1] bg-white text-navy hover:bg-navy-50; }
+  .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
+  .btn-sm { @apply px-2.5 py-1.5 text-xs; }
+  .input { @apply w-full rounded-lg border border-[#D6DFF1] bg-white px-3 py-2 text-sm text-[#0B1B3F] placeholder:text-slate2/70 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15 disabled:bg-[#F4F6FB]; }
+  .label { @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate2; }
+  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold; }
+  .th { @apply px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate2 whitespace-nowrap; }
+  .td { @apply px-3 py-2.5 text-sm align-top; }
+  .chip { @apply inline-flex items-center gap-1 rounded-md bg-navy-50 px-2 py-0.5 text-xs font-medium text-navy; }
+  .tab { @apply px-3 py-2 text-sm font-semibold text-slate2 border-b-2 border-transparent hover:text-navy whitespace-nowrap; }
+  .tab-active { @apply text-navy border-teal; }
+}
+.rich h1,.rich h2,.rich h3 { font-weight: 700; margin: .6em 0 .3em; } .rich p { margin: .4em 0; } .rich ul { list-style: disc; padding-left: 1.3em; } .rich ol { list-style: decimal; padding-left: 1.3em; } .rich a { color: var(--navy); text-decoration: underline; }
+.dot-pattern { background-image: radial-gradient(rgba(1,226,193,.25) 1px, transparent 1px); background-size: 18px 18px; }

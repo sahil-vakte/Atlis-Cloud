@@ -1,0 +1,8 @@
+node_modules
+.next
+storage
+.env.local
+.git
+
+.local
+database/atlis_cloud.sql

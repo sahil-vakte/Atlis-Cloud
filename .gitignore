@@ -1,0 +1,20 @@
+node_modules
+.next
+.env.local
+storage/uploads
+*.tsbuildinfo
+next-env.d.ts
+
+.local/
+
+# Local data and credentials
+.env
+.env.*
+!.env.example
+storage/
+.cache/
+database/atlis_cloud.sql
+
+# CV datasets may contain personal information
+tests/cv-samples/
+tests/cv-samples-blind/
