@@ -1,0 +1,39 @@
+# Production deployment
+
+The application is served at `http://45.10.192.154` by Nginx, which proxies to the Next.js service on `127.0.0.1:3000`.
+
+- App: `/opt/atlis-next/current` (symlink to a commit-specific release)
+- Runtime: `/opt/atlis-runtime/node` (Node 22, separate from the legacy Node 14 installation)
+- Service: `atlis-next.service`, running as `atlisapp`
+- Configuration: `/etc/atlis-cloud.env`, outside the repository
+- Database: existing `atlis`, accessed through a dedicated database-scoped account
+- Uploads: `/var/lib/atlis-next/uploads`; legacy upload copy: `/var/lib/atlis-next/legacy-uploads`
+- Pre-deployment backup: `/var/backups/atlis-cloud/`
+
+The old Laravel directory and `atlis_new` database are preserved. Schema migrations are additive except for migration 001's app-owned dropdown seed normalization. Migration checksums prevent silently changing an applied migration. A failed app health check restores the previous release when one exists; database migrations are not rolled back automatically.
+
+## Continuous integration and deployment
+
+`.github/workflows/deploy.yml` validates pull requests and pushes to `main` with Node 22, dependency installation, email-routing tests, and a production build. Successful main-branch runs upload the exact source revision over SSH and invoke the root-owned `/usr/local/bin/atlis-deploy` helper as `atlisdeploy`. The helper installs dependencies, runs migrations and recipient discovery, regenerates schema metadata, builds, switches the current release, restarts the app, and checks database-backed health.
+
+Required GitHub Actions secrets: `ATLIS_DEPLOY_KEY` and `ATLIS_KNOWN_HOSTS`. The dedicated SSH key cannot forward ports or allocate a terminal. The deployment account's only passwordless sudo command is restarting `atlis-next.service`.
+
+Changes to `deploy/deploy.sh` require installing the reviewed version to `/usr/local/bin/atlis-deploy` separately; the running pipeline cannot overwrite that root-owned helper.
+
+## Notification administration
+
+Open **Administration → Notification emails**. Each historical address displays its original purpose, an editable replacement destination, and an enable switch. General registration and reminder inboxes and per-entity overrides are editable on the same page. Discovery reads existing recipient fields without changing users' login addresses or historical business records.
+
+All To, CC and BCC addresses pass through the routing policy. Legacy company addresses without an enabled replacement are suppressed. Replacement destinations cannot point back to those legacy domains. No email is sent by viewing or saving this screen.
+
+Sending requires all three conditions: `EMAIL_DELIVERY_ENABLED=true` on the server, configured environment SMTP settings, and the admin delivery switch enabled. Deployment starts with sending disabled. Legacy database SMTP accounts are not automatically activated.
+
+## Operations
+
+```sh
+systemctl status atlis-next
+journalctl -u atlis-next -n 100 --no-pager
+curl --fail http://127.0.0.1:3000/api/health
+```
+
+Use a domain and HTTPS before regular use with sensitive business data. The initial IP endpoint uses HTTP as requested.

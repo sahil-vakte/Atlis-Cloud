@@ -46,7 +46,7 @@ export default function Settings() {
           <section className="card p-5">
             <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate2">More configuration</h2>
             <div className="grid gap-2 text-sm">
-              {[['/m/master-options', 'Dropdown options (job types, entities, statuses …)'], ['/m/email-settings', 'SMTP accounts'], ['/m/email-templates', 'Email templates'], ['/m/notification-alerts', 'Notification banners'], ['/roles', 'Roles & permissions'], ['/masters', 'All master data']].map(([h, t]) => (
+              {[['/admin/notification-emails', 'Notification emails and replacements'], ['/m/master-options', 'Dropdown options (job types, entities, statuses …)'], ['/m/email-settings', 'SMTP accounts'], ['/m/email-templates', 'Email templates'], ['/m/notification-alerts', 'Notification banners'], ['/roles', 'Roles & permissions'], ['/masters', 'All master data']].map(([h, t]) => (
                 <Link key={h} href={h} className="flex items-center justify-between rounded-lg border border-[#E6EBF4] px-3 py-2 hover:border-navy"><span className="font-medium text-navy">{t}</span><L.ChevronRight className="h-4 w-4 text-slate2" /></Link>))}
             </div>
           </section>

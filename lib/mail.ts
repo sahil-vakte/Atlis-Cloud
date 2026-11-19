@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
-import { one } from './db';
-import type { Settings } from './settings';
+import { one, query } from './db';
+import { getSettings, type Settings } from './settings';
+import { routeRecipients, type EmailRoute } from './email-routing';
 
 /** SMTP comes from .env, or from the `email_settings` table row of the given type (managed in Administration → SMTP settings). */
 async function transport(type?: string) {
@@ -15,9 +16,14 @@ async function transport(type?: string) {
   };
 }
 export async function sendMail(o: { to: string; cc?: string; bcc?: string; subject: string; html: string; smtpType?: string; attachments?: any[] }) {
+  if (process.env.EMAIL_DELIVERY_ENABLED !== 'true') return { sent: false };
+  if ((await getSettings()).email_delivery_enabled !== '1') return { sent: false };
+  const routes = await query<EmailRoute>('SELECT original_email,replacement_email,enabled FROM app_email_routes');
+  const to = routeRecipients(o.to, routes), cc = routeRecipients(o.cc, routes), bcc = routeRecipients(o.bcc, routes);
+  if (!to) return { sent: false };
   const tr = await transport(o.smtpType);
   if (!tr) { console.warn('[mail] SMTP not configured — email not sent:', o.subject, '→', o.to); return { sent: false }; }
-  await tr.t.sendMail({ from: tr.from, to: o.to, cc: o.cc, bcc: o.bcc, subject: o.subject, html: o.html, attachments: o.attachments });
+  await tr.t.sendMail({ from: tr.from, to, cc: cc || undefined, bcc: bcc || undefined, subject: o.subject, html: o.html, attachments: o.attachments });
   return { sent: true };
 }
 export function renderBrandedEmail(s: Settings, body: string) {

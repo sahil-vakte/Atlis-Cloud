@@ -1,0 +1,57 @@
+name: Validate and deploy
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: atlis-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      EMAIL_DELIVERY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:email
+      - run: npm run build
+      - run: git archive --format=tar.gz -o source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source
+          path: source.tar.gz
+          retention-days: 3
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: source
+      - name: Deploy verified source
+        env:
+          DEPLOY_KEY: ${{ secrets.ATLIS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.ATLIS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          trap 'rm -f ~/.ssh/id_ed25519' EXIT
+          scp -P 37195 -o BatchMode=yes source.tar.gz atlisdeploy@45.10.192.154:/opt/atlis-next/incoming/${{ github.sha }}.tar.gz
+          ssh -p 37195 -o BatchMode=yes atlisdeploy@45.10.192.154 /usr/local/bin/atlis-deploy ${{ github.sha }}

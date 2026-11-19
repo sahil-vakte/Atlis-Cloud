@@ -12,6 +12,7 @@ type Brand = { brand_name: string; brand_logo_dark: string; brand_icon: string }
 export type ShellUser = { id: number; name: string; email: string; role: number; roleTitle: string };
 
 const ADMIN_LINKS = [
+  { href: '/admin/notification-emails', label: 'Notification emails', icon: 'Mail' },
   { href: '/cv-parser', label: 'CV Parser', icon: 'ScanText' }, { href: '/reports', label: 'Reports', icon: 'BarChart3' }, { href: '/masters', label: 'Masters', icon: 'Settings2' },
   { href: '/m/users', label: 'Users', icon: 'UserCog' }, { href: '/roles', label: 'Roles & permissions', icon: 'ShieldCheck' }, { href: '/settings', label: 'Settings', icon: 'Settings' },
 ];

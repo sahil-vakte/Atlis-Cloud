@@ -2,7 +2,7 @@
   "name": "atlis-cloud",
   "version": "1.0.0",
   "private": true,
-  "description": "atlis.cloud \u2014 recruitment, workforce and PS Care platform (Next.js)",
+  "description": "atlis.cloud — recruitment, workforce and PS Care platform (Next.js)",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
@@ -10,7 +10,10 @@
     "schema": "node scripts/generate-schema.mjs",
     "rebrand-db": "node scripts/rebrand-db.mjs",
     "test:cv": "tsx scripts/test-cv-parser.mts tests/cv-samples && tsx scripts/test-cv-parser.mts tests/cv-samples-blind",
-    "migrate": "node scripts/migrate.mjs"
+    "migrate": "node scripts/migrate.mjs",
+    "test:email": "tsx --test tests/email-routing.test.ts",
+    "typecheck": "tsc --noEmit",
+    "notifications:discover": "tsx scripts/discover-email-routes.mts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.1.1",
@@ -25,7 +28,7 @@
     "lucide-react": "^1.76.0",
     "mammoth": "^1.13.0",
     "mysql2": "^3.24.6",
-    "next": "^14.2.15",
+    "next": "14.2.35",
     "nodemailer": "^10.6.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

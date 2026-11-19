@@ -125,7 +125,7 @@ async function ocrImages(images: Buffer[]): Promise<string> {
   const { createWorker } = await import('tesseract.js');
   const path = await import('node:path');
   const langPath = path.join(process.cwd(), 'node_modules', '@tesseract.js-data', 'eng', '4.0.0');
-  const worker = await createWorker('eng', 1, { langPath, gzip: true, cachePath: path.join(process.cwd(), '.cache', 'tesseract') } as any);
+  const worker = await createWorker('eng', 1, { langPath, gzip: true, cachePath: process.env.TESSERACT_CACHE_DIR || path.join(process.cwd(), '.cache', 'tesseract') } as any);
   try {
     const out: string[] = [];
     for (const img of images) {
