@@ -5,6 +5,7 @@ import { one } from '@/lib/db';
 import Shell from '@/components/Shell';
 
 export const dynamic = 'force-dynamic';
+export const metadata = { robots: { index: false, follow: false } };
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const u = await getSession();
   if (!u) redirect('/login');

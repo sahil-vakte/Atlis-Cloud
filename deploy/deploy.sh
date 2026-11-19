@@ -15,6 +15,7 @@ cd "$release"
 ln -s /etc/atlis-cloud.env .env.local
 npm ci --no-audit --no-fund
 npm run test:email
+npm run test:auth
 npm run migrate
 # Recipient discovery is an explicit admin action; deployments must not restore deleted mappings.
 npm run schema

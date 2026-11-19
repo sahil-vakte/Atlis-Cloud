@@ -2,7 +2,7 @@
   "name": "atlis-cloud",
   "version": "1.0.0",
   "private": true,
-  "description": "atlis.cloud — recruitment, workforce and PS Care platform (Next.js)",
+  "description": "Atlis Cloud - recruitment, workforce and PS Care platform (Next.js)",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
@@ -13,7 +13,9 @@
     "migrate": "node scripts/migrate.mjs",
     "test:email": "tsx --test tests/email-routing.test.ts tests/navigation.test.ts",
     "typecheck": "tsc --noEmit",
-    "notifications:discover": "tsx scripts/discover-email-routes.mts"
+    "notifications:discover": "tsx scripts/discover-email-routes.mts",
+    "test:auth": "tsx --test tests/totp.test.ts",
+    "test:auth-flow": "tsx scripts/test-auth-flow.mts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.1.1",
@@ -30,6 +32,8 @@
     "mysql2": "^3.24.6",
     "next": "14.2.35",
     "nodemailer": "^10.6.0",
+    "otpauth": "^9.6.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^3.11.0",
@@ -42,6 +46,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^26.6.6",
     "@types/nodemailer": "^8.0.2",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.6.2",
