@@ -14,5 +14,6 @@ try {
   assert.equal(data.kind,'internal');
   assert.equal(typeof data.kpis.activeConsultants,'number');
   assert.ok(Array.isArray(data.months));
+  assert.equal(data.months.length,12);
   console.log('Dashboard API and KPI payload verified against the deployed database.');
 } finally { await db.end(); }

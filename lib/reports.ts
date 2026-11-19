@@ -20,12 +20,15 @@ export async function dashboard(u: SessionUser) {
     c('SELECT COUNT(*) n FROM prospects WHERE deleted=0'),
   ]);
   const months = await query<{ m: string; requirements: number; profiles: number; submissions: number }>(`
-    SELECT m.m,
-      (SELECT COUNT(*) FROM requirement r WHERE r.deleted=0 AND DATE_FORMAT(r.created_at,'%Y-%m')=m.m) requirements,
-      (SELECT COUNT(*) FROM profile p WHERE p.deleted=0 AND DATE_FORMAT(p.created_at,'%Y-%m')=m.m) profiles,
-      (SELECT COUNT(*) FROM sourcing s WHERE s.deleted=0 AND s.submitted=1 AND DATE_FORMAT(s.created_at,'%Y-%m')=m.m) submissions
+    SELECT m.m, COALESCE(r.n,0) requirements, COALESCE(p.n,0) profiles, COALESCE(s.n,0) submissions
     FROM (SELECT DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL n MONTH),'%Y-%m') m FROM
       (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11) x) m
+    LEFT JOIN (SELECT DATE_FORMAT(created_at,'%Y-%m') m, COUNT(*) n FROM requirement
+      WHERE deleted=0 AND created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH),'%Y-%m-01') GROUP BY m) r ON r.m=m.m
+    LEFT JOIN (SELECT DATE_FORMAT(created_at,'%Y-%m') m, COUNT(*) n FROM profile
+      WHERE deleted=0 AND created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH),'%Y-%m-01') GROUP BY m) p ON p.m=m.m
+    LEFT JOIN (SELECT DATE_FORMAT(created_at,'%Y-%m') m, COUNT(*) n FROM sourcing
+      WHERE deleted=0 AND submitted=1 AND created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH),'%Y-%m-01') GROUP BY m) s ON s.m=m.m
     ORDER BY m.m`);
   const pipeline = await query<{ label: string; value: number }>(`SELECT IFNULL(ps.profileStatus,'Not set') label, COUNT(*) value FROM sourcing s
     LEFT JOIN master_profile_status ps ON ps.pStatusID=s.pStatusID WHERE s.deleted=0 AND s.submitted=1 GROUP BY label ORDER BY value DESC LIMIT 12`);
