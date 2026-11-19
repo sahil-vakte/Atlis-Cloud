@@ -1,10 +1,12 @@
 import { query, one } from './db';
 import type { SessionUser } from './session';
+import { reportDate } from './report-dates';
 
 const PORTAL = new Set([3, 16, 17, 29]);
 export async function dashboard(u: SessionUser) {
   if (PORTAL.has(u.role)) return portalDashboard(u);
   const c = async (sql: string, p: any[] = []) => Number((await one<{ n: number }>(sql, p))?.n ?? 0);
+  const end = reportDate('candidate_data', 'endDate');
   const [openReqs, totalReqs, profiles, sourcing, submissions, sentToClient, activeConsultants, pendingTimesheets, pendingInvoices, prospects] = await Promise.all([
     c('SELECT COUNT(*) n FROM requirement WHERE deleted=0 AND active=1'),
     c('SELECT COUNT(*) n FROM requirement WHERE deleted=0'),
@@ -12,7 +14,7 @@ export async function dashboard(u: SessionUser) {
     c('SELECT COUNT(*) n FROM sourcing WHERE deleted=0'),
     c('SELECT COUNT(*) n FROM sourcing WHERE deleted=0 AND submitted=1'),
     c("SELECT COUNT(*) n FROM sourcing WHERE deleted=0 AND isSentToClient='1'"),
-    c('SELECT COUNT(*) n FROM candidate_data WHERE status=1 AND (endDate IS NULL OR endDate="" OR STR_TO_DATE(endDate, "%Y-%m-%d") >= CURDATE() OR STR_TO_DATE(endDate, "%d-%m-%Y") >= CURDATE())'),
+    c(`SELECT COUNT(*) n FROM candidate_data WHERE status=1 AND (${end.empty} OR ${end.value} >= CURDATE())`),
     c("SELECT COUNT(*) n FROM candidate_timesheet WHERE deleted=0 AND verificationStatus='pending'"),
     c("SELECT COUNT(*) n FROM candidate_invoice WHERE deleted=0 AND verificationStatus='pending'"),
     c('SELECT COUNT(*) n FROM prospects WHERE deleted=0'),
@@ -61,8 +63,9 @@ async function portalDashboard(u: SessionUser) {
 
 async function activeBanners(u: SessionUser) {
   try {
+    const start = reportDate('notification_alert', 'startDate'), end = reportDate('notification_alert', 'endDate');
     return await query<any>(`SELECT id, title FROM notification_alert WHERE deleted=0 AND status=1 AND (role IS NULL OR role='' OR FIND_IN_SET(?, role))
-      AND (startDate IS NULL OR startDate='' OR startDate <= CURDATE()) AND (endDate IS NULL OR endDate='' OR endDate >= CURDATE())`, [String(u.role)]);
+      AND (${start.empty} OR ${start.value} <= CURDATE()) AND (${end.empty} OR ${end.value} >= CURDATE())`, [String(u.role)]);
   } catch { return []; }
 }
 
@@ -111,12 +114,13 @@ export async function technologyReport() {
 }
 
 export async function pscareReport(from: string, to: string) {
+  const end = reportDate('candidate_data', 'endDate');
   const byStatus = await query<any>(`SELECT IFNULL(NULLIF(candidatureStatus,''),'Not set') label, COUNT(*) value FROM candidate_data GROUP BY label ORDER BY value DESC`);
   const byClient = await query<any>(`SELECT IFNULL(NULLIF(endClient,''),'Not set') label, COUNT(*) value FROM candidate_data GROUP BY label ORDER BY value DESC LIMIT 15`);
   const byRecruiter = await query<any>(`SELECT TRIM(CONCAT(IFNULL(u.first_name,''),' ',IFNULL(u.last_name,''))) label, COUNT(*) value FROM candidate_data c LEFT JOIN users u ON u.id=c.recruiterID GROUP BY c.recruiterID ORDER BY value DESC LIMIT 15`);
   const starts = await query<any>(`SELECT DATE_FORMAT(created_at,'%Y-%m') label, COUNT(*) value FROM candidate_data WHERE created_at BETWEEN ? AND ? GROUP BY label ORDER BY label`, [`${from} 00:00:00`, `${to} 23:59:59`]);
   const ending = await query<any>(`SELECT cdID, candidateName, role, endClient, endDate FROM candidate_data
-    WHERE COALESCE(STR_TO_DATE(endDate,'%Y-%m-%d'), STR_TO_DATE(endDate,'%d-%m-%Y')) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 60 DAY) ORDER BY endDate LIMIT 50`);
+    WHERE ${end.value} BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 60 DAY) ORDER BY ${end.value} LIMIT 50`);
   return { byStatus, byClient, byRecruiter, starts, ending };
 }
 

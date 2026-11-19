@@ -25,7 +25,10 @@ mv -Tf "$base/current.next" "$base/current"
 healthy=false
 if sudo /usr/bin/systemctl restart atlis-next.service; then
   for attempt in {1..30}; do
-    if curl --fail --silent --max-time 5 http://127.0.0.1:3000/api/health > /dev/null; then healthy=true; break; fi
+    if curl --fail --silent --max-time 5 http://127.0.0.1:3000/api/health > /dev/null; then
+      if node scripts/smoke-dashboard.mjs; then healthy=true; fi
+      break
+    fi
     sleep 2
   done
 fi
