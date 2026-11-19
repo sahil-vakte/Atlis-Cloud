@@ -2,6 +2,9 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { BriefcaseBusiness, Users, FileText, BarChart3, ShieldCheck, Layers3, Check, Building2 } from 'lucide-react';
 import './landing.css';
+import './public-ui.css';
+import PublicNav from '@/components/PublicNav';
+import PublicMotion from '@/components/PublicMotion';
 
 const title = 'Atlis Cloud | Recruitment, CRM & Workforce Management';
 const description = 'Bring recruitment, client relationships, consultant onboarding, timesheets and invoices together with Atlis Cloud. One connected workspace for your workforce.';
@@ -35,7 +38,7 @@ export default function LandingPage() {
   return <div className="ac-site">
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structured).replace(/</g, '\\u003c') }} />
     <a className="ac-skip" href="#main">Skip to content</a>
-    <header className="ac-nav ac-wrap"><Link href="/" aria-label="Atlis Cloud home"><img src="/brand/atlis-cloud_logo_horizontal_navy.svg" alt="Atlis Cloud" width="174" height="40" /></Link><nav aria-label="Main navigation"><a href="#features">Features</a><a href="#workflow">How it works</a><a href="#questions">FAQs</a><Link className="ac-button ac-button-small" href="/login">Sign in</Link></nav></header>
+    <PublicNav /><PublicMotion />
     <main id="main">
       <section className="ac-hero ac-wrap">
         <div className="ac-hero-copy"><p className="ac-eyebrow">RECRUITMENT. RELATIONSHIPS. WORKFORCE.</p><h1>Great people.<br />Connected work.<br /><span>One clear view.</span></h1><p className="ac-intro">From the first client conversation to the next consultant milestone. Bring your team, your talent and your operations together in Atlis Cloud.</p><div className="ac-actions"><Link className="ac-button" href="/login">Open your workspace</Link><a className="ac-text-link" href="#features">Explore the platform</a></div><p className="ac-hero-note"><ShieldCheck size={18} aria-hidden="true" /> Protected by authenticator verification</p></div>
@@ -49,6 +52,10 @@ export default function LandingPage() {
         </div>
       </section>
       <div className="ac-band"><div className="ac-wrap"><span>One connected workspace for</span><strong>Recruitment</strong><strong>Client relationships</strong><strong>Consultant care</strong><strong>Finance operations</strong></div></div>
+      <section className="ac-wrap ac-talent" id="opportunities">
+        <div><p className="ac-eyebrow">FOR PEOPLE READY FOR WHAT’S NEXT</p><h2>Your next chapter<br />starts with a possibility.</h2><p>Bring your experience, ambition and curiosity. Explore opportunities across technologies and disciplines, find a role that fits, and take your next step with Atlis Cloud.</p><div className="ac-actions"><Link href="/careers" className="ac-button">Explore open roles</Link><span className="talent-note">Find your fit. Make your move.</span></div></div>
+        <div className="talent-visual" aria-label="Explore opportunities by specialism"><div className="talent-orbit" aria-hidden="true" /><span className="talent-kicker">A WORLD OF POSSIBILITIES</span><div className="talent-symbol"><BriefcaseBusiness size={42} strokeWidth={1.4} /></div><h3>Where your skills<br />meet your next challenge.</h3><div className="talent-tags"><span>Technology</span><span>Consulting</span><span>Delivery</span></div><Link href="/careers">Discover current opportunities</Link></div>
+      </section>
       <section id="features" className="ac-section ac-wrap"><div className="ac-section-heading"><p className="ac-eyebrow">THE WHOLE PICTURE</p><h2>Less switching.<br />More moving forward.</h2><p>Give each team the tools it needs, with the shared context that keeps everyone working together.</p></div><div className="ac-features">{features.map(({icon:Icon,title,text}) => <article key={title}><div className="ac-feature-icon"><Icon size={25} aria-hidden="true" /></div><h3>{title}</h3><p>{text}</p></article>)}</div></section>
       <section id="workflow" className="ac-workflow"><div className="ac-wrap ac-workflow-grid"><div><p className="ac-eyebrow">BUILT AROUND THE WAY YOU WORK</p><h2>A placement is a milestone.<br /><span>The relationship continues.</span></h2><p>Connect the work before, during and after an engagement, so important details travel with your people.</p><Link className="ac-button ac-button-light" href="/login">Sign in to Atlis Cloud</Link></div><div className="ac-workflow-list">{[['Build the relationship','Track prospects, contacts and requirements to give each opportunity a clear starting point.'],['Bring the right people together','Move from candidate profiles and CVs to submissions, onboarding and consultant records.'],['Keep the engagement on track','Coordinate care, timesheets, invoices and reporting as the relationship grows.']].map(([h,p])=><article key={h}><h3>{h}</h3><p>{p}</p></article>)}</div></div></section>
       <section className="ac-section ac-wrap ac-access"><div className="ac-access-art"><ShieldCheck size={96} strokeWidth={1.1} aria-hidden="true" /><span>Password + authenticator</span><div aria-hidden="true">● ● ● &nbsp; ● ● ●</div></div><div><p className="ac-eyebrow">A MORE SECURE START</p><h2>Your workspace.<br />An extra layer of protection.</h2><p>Every account starts with authenticator setup. Scan your personal QR code, confirm the code in your app, and you’re ready. Future sign-ins require both your password and a fresh authenticator code.</p><p className="ac-access-note">Role-based permissions help each team member access the work relevant to them.</p></div></section>

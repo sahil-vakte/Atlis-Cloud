@@ -1,30 +1,25 @@
-import { getSettings } from '@/lib/settings';
-export default async function AuthFrame({ children }: { children: React.ReactNode }) {
-  const s = await getSettings();
-  return (
-    <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden overflow-hidden bg-navy lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <div className="dot-pattern absolute inset-0 opacity-40" />
-        <div className="absolute -right-32 -top-32 h-[420px] w-[420px] rounded-full bg-teal/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-20 h-[480px] w-[480px] rounded-full bg-[#576E9A]/30 blur-3xl" />
-        <img src={s.brand_logo_dark} alt={s.brand_name} className="relative h-9 w-auto self-start" />
-        <div className="relative max-w-lg">
-          <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-white">Hire, place and look after your consultants — in one place.</h1>
-          <p className="mt-4 text-lg text-[#B3C0DB]">{s.brand_tagline}</p>
-          <div className="mt-10 grid grid-cols-3 gap-4">
-            {[['Requirements', 'to placements'], ['CV parsing', 'on your own server'], ['PS Care', 'timesheets & invoices']].map(([a, b]) => (
-              <div key={a} className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-sm font-bold text-white">{a}</p><p className="text-xs text-[#B3C0DB]">{b}</p></div>
-            ))}
-          </div>
-        </div>
-        <p className="relative text-xs text-[#B3C0DB]">© {new Date().getFullYear()} {s.brand_name}</p>
-      </div>
-      <div className="flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
-          <img src={s.brand_logo_light} alt={s.brand_name} className="mb-10 h-8 w-auto lg:hidden" />
-          {children}
+﻿import Link from 'next/link';
+import { ShieldCheck, Users, BriefcaseBusiness, BarChart3 } from 'lucide-react';
+import './auth.css';
+export default function AuthFrame({ children }: { children: React.ReactNode }) {
+  return <div className="auth-experience auth-v2">
+    <aside className="auth-story">
+      <Link href="/" className="auth-brand"><img src="/brand/atlis-cloud_logo_horizontal_white.svg" alt="Atlis Cloud home" width={170} height={40} /></Link>
+      <div className="auth-story-content">
+        <p className="auth-eyebrow">YOUR CONNECTED WORKSPACE</p>
+        <h1>People at the heart.<br /><em>Progress in every step.</em></h1>
+        <p>Bring your recruitment, relationships and workforce together. Everything you need to move forward, in one place.</p>
+        <div className="auth-benefits">
+          {[{Icon:Users,title:'Meaningful connections',text:'Your people and relationships, together.'},{Icon:BriefcaseBusiness,title:'Work that moves forward',text:'From opportunity to ongoing consultant care.'},{Icon:BarChart3,title:'A clearer perspective',text:'Stay close to the details that matter.'}].map(({Icon,title,text})=><div className="auth-benefit" key={title}><span><Icon size={20} strokeWidth={1.6} /></span><div><strong>{title}</strong><p>{text}</p></div></div>)}
         </div>
       </div>
-    </div>
-  );
+      <div className="auth-story-footer"><ShieldCheck size={17} /><span>A secure space for your team</span><span>© {new Date().getFullYear()} Atlis Cloud</span></div>
+      <div className="auth-orbit" aria-hidden="true" />
+    </aside>
+    <main className="auth-form-area">
+      <div className="auth-topbar"><Link href="/" className="auth-mobile-brand"><img src="/brand/atlis-cloud_logo_horizontal_navy.svg" alt="Atlis Cloud home" width={145} height={34} /></Link><Link href="/careers"><BriefcaseBusiness size={16} /> Open roles</Link></div>
+      <div className="auth-form-scroll"><div className="auth-form-card"><div className="auth-lock"><ShieldCheck size={25} /></div>{children}</div></div>
+      <p className="auth-bottom-note"><ShieldCheck size={14} /> Protected with password and authenticator verification</p>
+    </main>
+  </div>;
 }

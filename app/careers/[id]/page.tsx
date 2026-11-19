@@ -1,42 +1,27 @@
-'use client';
+﻿'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import * as L from '@/components/icons';
-
+import { MapPin, Clock3, BriefcaseBusiness, CheckCircle2, FileUp, ShieldCheck, Layers3 } from 'lucide-react';
 export default function Job({ params }: { params: { id: string } }) {
-  const [j, setJ] = useState<any>(null); const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false); const [done, setDone] = useState(''); const [formErr, setFormErr] = useState('');
-  useEffect(() => { fetch(`/api/public/jobs/${params.id}`).then(async (r) => (r.ok ? setJ(await r.json()) : setErr('This role is no longer open.'))); }, [params.id]);
+  const [job, setJob] = useState<any>(null), [error, setError] = useState('');
+  const [busy, setBusy] = useState(false), [done, setDone] = useState(false), [formError, setFormError] = useState(''), [fileName, setFileName] = useState('');
+  useEffect(() => { const controller = new AbortController(); setJob(null); setError('');
+    fetch(`/api/public/jobs/${params.id}`, { signal: controller.signal }).then(async r => { if (!r.ok) throw new Error(r.status === 404 ? 'This opportunity is no longer available.' : 'Unable to load this opportunity right now.'); setJob(await r.json()); }).catch(e => { if (!controller.signal.aborted) setError(e.message); });
+    return () => controller.abort();
+  }, [params.id]);
   const apply = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault(); setBusy(true); setFormErr('');
-    const fd = new FormData(e.currentTarget); fd.append('jobId', params.id);
-    const r = await fetch('/api/public/apply', { method: 'POST', body: fd }); const d = await r.json();
-    r.ok ? setDone(d.message) : setFormErr(d.message); setBusy(false);
+    e.preventDefault(); const form = new FormData(e.currentTarget), file = form.get('cv');
+    if (file instanceof File && file.size > 10 * 1024 * 1024) { setFormError('Please choose a CV under 10 MB.'); return; }
+    form.append('jobId', params.id); setBusy(true); setFormError('');
+    try { const r = await fetch('/api/public/apply', { method: 'POST', body: form }); const data = await r.json(); if (!r.ok) throw new Error(data.message || 'Unable to submit. Please try again.'); setDone(true); }
+    catch (e) { setFormError(e instanceof Error ? e.message : 'Unable to connect. Please try again.'); }
+    finally { setBusy(false); }
   };
-  if (err) return <main className="mx-auto max-w-3xl px-6 py-16"><div className="card p-8 text-center">{err} <Link href="/careers" className="font-semibold text-navy underline">See open roles</Link></div></main>;
-  if (!j) return <main className="mx-auto max-w-3xl px-6 py-16 text-center text-slate2">Loading…</main>;
-  return (
-    <main className="mx-auto grid max-w-6xl gap-6 px-6 py-8 lg:grid-cols-[1fr_380px]">
-      <article className="card p-7">
-        <Link href="/careers" className="text-sm font-semibold text-slate2 hover:text-navy">← All roles</Link>
-        <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-navy">{j.title}</h1>
-        <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate2">{j.location && <span className="inline-flex items-center gap-1"><L.MapPin className="h-4 w-4" />{j.location}</span>}{j.duration && <span className="inline-flex items-center gap-1"><L.Clock className="h-4 w-4" />{j.duration}</span>}{j.workMode && <span>{j.workMode}</span>}{j.experience && <span>{j.experience}</span>}</p>
-        {j.skillset && <div className="mt-5 flex flex-wrap gap-1.5">{String(j.skillset).split(/[,;]/).map((s: string) => s.trim()).filter(Boolean).slice(0, 20).map((s: string) => <span key={s} className="chip">{s}</span>)}</div>}
-        <div className="rich mt-6 text-[15px] leading-relaxed" dangerouslySetInnerHTML={{ __html: String(j.jobDescription || j.summary || '').replace(/<(script|style|iframe)[\s\S]*?<\/\1>/gi, '').replace(/\son\w+="[^"]*"/gi, '') }} />
-      </article>
-      <aside className="card h-fit p-6 lg:sticky lg:top-6">
-        {done ? <div className="text-center"><L.CheckCircle2 className="mx-auto h-10 w-10 text-teal-700" /><p className="mt-3 font-semibold text-navy">{done}</p><p className="mt-1 text-sm text-slate2">A recruiter will be in touch if your experience is a match.</p></div> : (
-          <form onSubmit={apply} className="space-y-3">
-            <h2 className="text-lg font-bold text-navy">Apply for this role</h2>
-            {formErr && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formErr}</p>}
-            <div><label className="label">Full name</label><input name="name" required className="input" /></div>
-            <div><label className="label">Email</label><input name="email" type="email" required className="input" /></div>
-            <div><label className="label">Phone</label><input name="phone" className="input" /></div>
-            <div><label className="label">CV</label><input name="cv" type="file" required accept=".pdf,.doc,.docx,.rtf,.odt,.txt" className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-navy-50 file:px-3 file:py-2 file:font-semibold file:text-navy" /></div>
-            <label className="flex items-start gap-2 text-xs text-slate2"><input name="consent" type="checkbox" required className="mt-0.5" /> I agree that my details will be stored and used to contact me about this and similar roles, in line with the privacy notice.</label>
-            <button className="btn-primary w-full" disabled={busy}>{busy ? <L.Loader2 className="h-4 w-4 animate-spin" /> : <L.Send className="h-4 w-4" />} Submit application</button>
-          </form>)}
-      </aside>
-    </main>
-  );
+  if (error) return <main className="ac-wrap jobs-empty"><BriefcaseBusiness size={38} /><h1>{error}</h1><p>There may be another opportunity that’s right for you.</p><Link className="ac-button" href="/careers">Browse open roles</Link></main>;
+  if (!job) return <main className="ac-wrap jobs-empty" aria-busy="true"><div className="job-skeleton"><div /><div /></div><p>Getting the details ready…</p></main>;
+  const skills = [...new Set(String(job.skillset || '').replace(/<[^>]*>/g, ' ').split(/[,;]/).map(s => s.trim()).filter(Boolean))];
+  return <main><section className="job-detail-hero"><div className="ac-wrap"><nav aria-label="Breadcrumb" className="job-breadcrumb"><Link href="/">Home</Link><span>/</span><Link href="/careers">Open roles</Link><span>/</span><span>Role details</span></nav><span className="job-category">{job.technology || 'Your next opportunity'}</span><h1>{job.title}</h1><div className="job-meta">{(job.location || job.city) && <span><MapPin size={17} />{job.location || job.city}</span>}{job.jobType && <span><BriefcaseBusiness size={17} />{job.jobType}</span>}{job.workMode && <span><Layers3 size={17} />{job.workMode}</span>}{job.duration && <span><Clock3 size={17} />{job.duration}</span>}</div><a className="ac-button mobile-apply" href="#apply">Apply for this role</a></div></section>
+    <div className="ac-wrap job-detail-layout"><article className="job-description"><div className="job-overview">{[['Specialism',job.technology],['Experience',job.experience],['Engagement',job.jobType],['Duration',job.duration]].filter(([,value]) => value).map(([label,value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div><h2>The opportunity</h2><p className="job-intro">Explore the role, see how your experience fits, and take the next step in your career.</p><div className="rich job-rich" dangerouslySetInnerHTML={{ __html: String(job.jobDescription || job.summary || '<p>Further details will be discussed during the recruitment process.</p>').replace(/<(script|style|iframe)[\s\S]*?<\/\1>/gi, '').replace(/\son\w+="[^"]*"/gi, '') }} />{skills.length > 0 && <section className="job-skills"><h2>Skills & expertise</h2><div className="skill-tags">{skills.slice(0,20).map(skill => <span key={skill}>{skill}</span>)}</div></section>}<div className="job-next"><ShieldCheck size={28} /><div><h3>What happens next?</h3><p>Send your CV using the application form. Our recruitment team will review your experience and contact you if it matches the opportunity.</p></div></div><Link href="/careers" className="ac-text-link">Explore more open roles</Link></article>
+    <aside className="job-application" id="apply">{done ? <div className="application-success" role="status"><CheckCircle2 size={48} /><p className="ac-eyebrow">YOUR NEXT CHAPTER</p><h2>You’ve taken the first step.</h2><p>Thank you. Your application has been received. Our team will be in touch if your experience matches this role.</p><Link href="/careers" className="ac-button">Explore more opportunities</Link></div> : <><div className="application-heading"><span className="application-icon"><FileUp size={25} /></span><p className="ac-eyebrow">LET’S GET STARTED</p><h2>Make your next move.</h2><p>Tell us a little about yourself and share your CV.</p></div><form onSubmit={apply} className="application-form">{formError && <p className="application-error" role="alert">{formError}</p>}<div><label htmlFor="app-name">Full name <span>*</span></label><input id="app-name" name="name" autoComplete="name" placeholder="Your full name" required /></div><div><label htmlFor="app-email">Email address <span>*</span></label><input id="app-email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required /></div><div><label htmlFor="app-phone">Phone number <small>Optional</small></label><input id="app-phone" name="phone" type="tel" autoComplete="tel" placeholder="Include country code" /></div><div><label htmlFor="app-cv">Your CV <span>*</span></label><div className="cv-upload"><FileUp size={25} /><strong>{fileName || 'Choose your CV'}</strong><span>PDF, DOC, DOCX, RTF, ODT or TXT · Max 10 MB</span><input id="app-cv" name="cv" type="file" required accept=".pdf,.doc,.docx,.rtf,.odt,.txt" onChange={e => setFileName(e.target.files?.[0]?.name || '')} /></div></div><label className="application-consent"><input name="consent" type="checkbox" required /><span>I agree that my details will be stored and used to contact me about this and similar roles.</span></label><button className="ac-button" disabled={busy}>{busy ? 'Submitting your application…' : 'Submit application'}</button><p className="application-footnote"><ShieldCheck size={15} /> Your next step starts here.</p></form></>}</aside></div>
+  </main>;
 }

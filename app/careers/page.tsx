@@ -1,42 +1,35 @@
-'use client';
+﻿'use client';
 import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import * as L from '@/components/icons';
-import clsx from 'clsx';
-
+import { Search, MapPin, Clock3, BriefcaseBusiness, SlidersHorizontal, SearchX, RefreshCw, Layers3 } from 'lucide-react';
+type Job = { id: number; title: string; technology?: string; location?: string; city?: string; duration?: string; workMode?: string; jobType?: string; skillset?: string };
+type BoardData = { jobs: Job[]; technologies: { slug: string; name: string; jobs: number }[] };
 function Board() {
-  const sp = useSearchParams(); const router = useRouter();
-  const tech = sp.get('technology') || '';
-  const [q, setQ] = useState(sp.get('q') || '');
-  const [d, setD] = useState<any>(null);
-  useEffect(() => { const t = setTimeout(() => fetch(`/api/public/jobs?technology=${encodeURIComponent(tech)}&q=${encodeURIComponent(q)}`).then((r) => r.json()).then(setD), 200); return () => clearTimeout(t); }, [tech, q]);
-  return (
-    <>
-      <section className="bg-navy pb-16 pt-6">
-        <div className="mx-auto max-w-6xl px-6">
-          <h1 className="text-4xl font-extrabold tracking-tight text-white">Find your next role</h1>
-          <p className="mt-2 text-lg text-[#B3C0DB]">Contract and permanent opportunities with leading organisations.</p>
-          <div className="relative mt-6 max-w-2xl"><L.Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate2" />
-            <input className="input h-14 rounded-2xl pl-12 text-base" placeholder="Job title, skill or location" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-        </div>
-      </section>
-      <main className="mx-auto -mt-8 max-w-6xl px-6">
-        {d?.technologies?.length > 0 && <div className="mb-5 flex flex-wrap gap-2">
-          <button onClick={() => router.push('/careers')} className={clsx('rounded-full px-3.5 py-1.5 text-sm font-semibold shadow-card', !tech ? 'bg-teal text-navy-900' : 'bg-white text-navy')}>All roles</button>
-          {d.technologies.map((t: any) => <button key={t.slug || t.name} onClick={() => router.push(`/careers?technology=${encodeURIComponent(t.slug || t.name)}`)} className={clsx('rounded-full px-3.5 py-1.5 text-sm font-semibold shadow-card', tech === (t.slug || t.name) ? 'bg-teal text-navy-900' : 'bg-white text-navy')}>{t.name} <span className="opacity-60">{t.jobs}</span></button>)}
-        </div>}
-        {!d ? <div className="card p-10 text-center text-slate2">Loading roles…</div> : !d.jobs.length ? <div className="card p-10 text-center text-slate2">No open roles match right now. Please check back soon.</div> : (
-          <div className="grid gap-4 md:grid-cols-2">{d.jobs.map((j: any) => (
-            <Link key={j.id} href={`/careers/${j.id}`} className="card block p-5 transition hover:-translate-y-0.5 hover:border-navy">
-              <div className="flex items-start justify-between gap-3"><h2 className="text-lg font-bold text-navy">{j.title}</h2>{j.technology && <span className="badge bg-navy-50 text-navy">{j.technology}</span>}</div>
-              <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate2">{(j.location || j.city) && <span className="inline-flex items-center gap-1"><L.MapPin className="h-3.5 w-3.5" />{j.location || j.city}</span>}{j.duration && <span className="inline-flex items-center gap-1"><L.Clock className="h-3.5 w-3.5" />{j.duration}</span>}{j.workMode && <span>{j.workMode}</span>}{j.jobType && <span>{j.jobType}</span>}</p>
-              {j.skillset && <p className="mt-3 line-clamp-2 text-sm">{String(j.skillset).replace(/<[^>]+>/g, ' ')}</p>}
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-navy">View & apply <L.ArrowRight className="h-4 w-4" /></span>
-            </Link>))}</div>
-        )}
-      </main>
-    </>
-  );
+  const sp = useSearchParams(), router = useRouter(), tech = sp.get('technology') || '';
+  const [q, setQ] = useState(sp.get('q') || ''), [data, setData] = useState<BoardData | null>(null);
+  const [error, setError] = useState(''), [loading, setLoading] = useState(true), [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError('');
+    const timer = setTimeout(async () => { try {
+      const r = await fetch(`/api/public/jobs?technology=${encodeURIComponent(tech)}&q=${encodeURIComponent(q)}`, { signal: controller.signal });
+      if (!r.ok) throw new Error('We could not load opportunities. Please try again.');
+      setData(await r.json()); setLoading(false);
+    } catch (e) { if (!controller.signal.aborted) { setError(e instanceof Error ? e.message : 'Unable to connect.'); setLoading(false); } } }, 250);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [tech, q, retry]);
+  const selectTech = (value: string) => { const params = new URLSearchParams(); if (value) params.set('technology', value); if (q) params.set('q', q); router.replace('/careers' + (params.size ? '?' + params : ''), { scroll: false }); };
+  const clear = () => { setQ(''); router.replace('/careers', { scroll: false }); };
+  return <main>
+    <section className="jobs-hero"><div className="ac-wrap jobs-hero-grid"><div><p className="ac-eyebrow">YOUR EXPERIENCE. YOUR AMBITION. YOUR NEXT CHAPTER.</p><h1>Good work starts<br />with the <em>right role.</em></h1><p>Explore opportunities that put your skills to work. Find a new challenge, build on what you know, and discover what comes next.</p></div><div className="jobs-hero-art" aria-hidden="true"><div className="job-art-ring" /><BriefcaseBusiness size={62} strokeWidth={1.2} /><span>Make your next move.</span><div className="job-art-label"><Layers3 size={18} /> A place for your potential</div></div></div></section>
+    <section className="ac-wrap jobs-board" aria-label="Find open roles">
+      <div className="jobs-search"><Search size={23} aria-hidden="true" /><label htmlFor="job-search" className="sr-only">Search by job title, skill or location</label><input id="job-search" value={q} onChange={e => setQ(e.target.value)} placeholder="Job title, skill or location" type="search" /><span>Find your next opportunity</span></div>
+      <div className="jobs-layout"><aside className="jobs-filters"><div className="filter-title"><SlidersHorizontal size={18} /><h2>Find your focus</h2></div><p>Explore by specialism</p><div className="technology-list"><button aria-pressed={!tech} className={!tech ? 'selected' : ''} onClick={() => selectTech('')}>All opportunities</button>{data?.technologies.map(t => <button key={t.slug || t.name} aria-pressed={tech === (t.slug || t.name)} className={tech === (t.slug || t.name) ? 'selected' : ''} onClick={() => selectTech(t.slug || t.name)}><span>{t.name}</span><span>{t.jobs}</span></button>)}</div>{(q || tech) && <button className="filter-clear" onClick={clear}>Clear filters</button>}<div className="career-tip"><BriefcaseBusiness size={25} /><h3>Your next step matters.</h3><p>Take a closer look at a role to explore the details and send your CV.</p></div></aside>
+      <div><div className="jobs-results-heading"><div><p className="ac-eyebrow">EXPLORE THE POSSIBILITIES</p><h2>Open opportunities</h2></div><span aria-live="polite">{loading ? 'Searching…' : error ? 'Try again' : `${data?.jobs.length || 0} roles found`}</span></div>
+      {error ? <div className="jobs-empty" role="alert"><RefreshCw size={34} /><h3>Let’s try that again.</h3><p>{error}</p><button className="ac-button" onClick={() => setRetry(v => v + 1)}>Reload opportunities</button></div> : loading ? <div aria-busy="true" aria-label="Loading opportunities" className="job-skeletons">{[1,2,3].map(n => <div key={n} className="job-skeleton"><div /><div /><div /></div>)}</div> : !data?.jobs.length ? <div className="jobs-empty"><SearchX size={38} /><h3>{q || tech ? 'A different search could open a door.' : 'Your next opportunity is on its way.'}</h3><p>{q || tech ? 'Try another skill, a broader location, or explore all our current opportunities.' : 'There are no published roles right now. Check back soon for new opportunities.'}</p>{(q || tech) && <button className="ac-button" onClick={clear}>See all roles</button>}</div> : <div className="job-list">{data.jobs.map(j => <Link className="job-card" href={`/careers/${j.id}`} key={j.id}><div className="job-card-top"><span className="job-category">{j.technology || 'Career opportunity'}</span>{j.jobType && <span className="job-type">{j.jobType}</span>}</div><h3>{j.title}</h3><div className="job-meta">{(j.location || j.city) && <span><MapPin size={15} />{j.location || j.city}</span>}{j.duration && <span><Clock3 size={15} />{j.duration}</span>}{j.workMode && <span><BriefcaseBusiness size={15} />{j.workMode}</span>}</div><div className="job-card-bottom"><div className="skill-tags">{String(j.skillset || '').replace(/<[^>]*>/g, ' ').split(/[,;]/).map(s => s.trim()).filter(Boolean).slice(0,3).map((s,i) => <span key={i}>{s}</span>)}</div><span className="job-view">View role & apply</span></div></Link>)}</div>}
+      </div></div>
+    </section><section className="career-bottom ac-wrap"><div><p className="ac-eyebrow">MORE THAN A JOB SEARCH</p><h2>A clear next step.<br />A new possibility.</h2></div><p>Every career takes its own path. Explore the details, see where your experience fits, and apply when you find the right opportunity.</p></section>
+  </main>;
 }
-export default function Page() { return <Suspense><Board /></Suspense>; }
+export default function Page() { return <Suspense fallback={<div className="jobs-empty">Loading opportunities…</div>}><Board /></Suspense>; }
