@@ -91,14 +91,18 @@ function TopBar({ user, onMenu }: { user: ShellUser; onMenu: () => void }) {
   const router = useRouter();
   const [q, setQ] = useState('');
   const [res, setRes] = useState<any[] | null>(null);
+  const [searchError, setSearchError] = useState('');
   const [userMenu, setUserMenu] = useState(false);
   const [notes, setNotes] = useState<{ items: any[]; unread: number } | null>(null);
   const [showNotes, setShowNotes] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (q.trim().length < 2) { setRes(null); return; }
-    const t = setTimeout(() => api(`/api/search?q=${encodeURIComponent(q)}`).then((r) => setRes(r.groups)).catch(() => setRes([])), 250);
-    return () => clearTimeout(t);
+    setSearchError('');
+    if (!q.trim()) { setRes(null); return; }
+    const controller = new AbortController();
+    setRes(null);
+    const t = setTimeout(() => api(`/api/search?q=${encodeURIComponent(q)}`, { signal: controller.signal }).then((r) => { if (!controller.signal.aborted) setRes(r.groups); }).catch(() => { if (!controller.signal.aborted) { setSearchError('Search could not load. Please try again.'); setRes([]); } }), 250);
+    return () => { clearTimeout(t); controller.abort(); };
   }, [q]);
   useEffect(() => { api('/api/notifications').then(setNotes).catch(() => {}); }, []);
   useEffect(() => {
@@ -116,7 +120,7 @@ function TopBar({ user, onMenu }: { user: ShellUser; onMenu: () => void }) {
         <input className="input h-10 rounded-xl bg-[#F4F6FB] pl-9" placeholder="Search candidates, requirements, clients…" value={q} onChange={(e) => setQ(e.target.value)} />
         {res && (
           <div className="card absolute left-0 right-0 top-12 max-h-[70vh] overflow-y-auto p-2">
-            {res.length === 0 && <p className="px-3 py-4 text-sm text-slate2">No matches for “{q}”.</p>}
+            {searchError ? <p className="px-3 py-4 text-sm text-red-700">{searchError}</p> : res.length === 0 && <p className="px-3 py-4 text-sm text-slate2">No matches for “{q}”.</p>}
             {res.map((g) => (
               <div key={g.module} className="mb-1">
                 <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-widest text-slate2">{g.label}</p>

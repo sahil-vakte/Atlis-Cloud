@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as L from './icons';
 import clsx from 'clsx';
 import { api, qs, fmtDate, stripHtml, recordFileUrl } from '@/lib/client';
@@ -49,16 +49,19 @@ export default function DataTable({ module, fk, compact, title, actions, default
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [colMenu, setColMenu] = useState(false);
+  const requestVersion = useRef(0);
 
   useEffect(() => { loadMeta(module).then(setMeta).catch((e) => setErr(e.message)); }, [module]);
   useEffect(() => { try { setHidden(new Set(JSON.parse(localStorage.getItem(`atlis_cols_${module}`) || '[]'))); } catch {} }, [module]);
   useEffect(() => { const t = setTimeout(() => { setDq(q); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
   const params = useMemo(() => ({ page, pageSize, q: dq, sort: sort?.c, dir: sort?.d, archived: archived ? 1 : undefined, fk: fk?.column, fkv: fk?.value, ...Object.fromEntries(Object.entries(filters).map(([k, v]) => [`f.${k}`, v])) }), [page, pageSize, dq, sort, archived, fk?.column, fk?.value, filters]);
   const load = useCallback(() => {
+    const version = ++requestVersion.current;
+    setErr('');
     setLoading(true);
-    api(`/api/m/${module}${qs(params)}`).then((r) => { setData(r); setSel(new Set()); }).catch((e) => setErr(e.message)).finally(() => setLoading(false));
+    api(`/api/m/${module}${qs(params)}`).then((r) => { if (version === requestVersion.current) { setData(r); setSel(new Set()); } }).catch((e) => { if (version === requestVersion.current) setErr(e.message); }).finally(() => { if (version === requestVersion.current) setLoading(false); });
   }, [module, params]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); return () => { requestVersion.current++; }; }, [load]);
 
   if (err) return <div className="card p-6 text-sm text-red-700">{err}</div>;
   if (!meta) return <div className="card"><Loading /></div>;

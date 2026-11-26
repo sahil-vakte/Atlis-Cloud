@@ -11,13 +11,14 @@ type Ctx = { params: { module: string; id: string; col: string } };
 /** Download a file attached to a record — access is checked against the record, so portal users only reach their own files. */
 export const GET = handler<Ctx>(async (req, { params }, user) => {
   const m = await moduleFor(params.module, user);
+  if (!m.files?.includes(params.col)) return fail(404, 'File field not found');
   const visible = await getRecord(m, user, params.id);
   if (!visible) return fail(404, 'Not found');
   const t = getTable(m.table);
   const row = await one(`SELECT * FROM ${ident(t.name)} WHERE ${ident(t.pk)}=?`, [params.id]);
   if (!row || !(params.col in row)) return fail(404, 'Not found');
   const file = await resolveRecordFile(m, row, params.col);
-  if (!file) return fail(404, 'The file is not on this server. Copy the old uploads folder to LEGACY_UPLOAD_DIR.');
+  if (!file) return fail(404, 'This file is not available. Please upload it again or ask an administrator to restore the original CV storage.');
   const ext = path.extname(file).slice(1).toLowerCase();
   const download = new URL(req.url).searchParams.get('download') === '1';
   if (m.key === 'profiles' || m.key === 'cv-versions') {
@@ -25,6 +26,10 @@ export const GET = handler<Ctx>(async (req, { params }, user) => {
     const r = await exec('UPDATE cv_download_tracking SET download_count=download_count+1, last_download_time=NOW() WHERE user_id=?', [user.id]).catch(() => null);
     if (r && !r.affectedRows) await exec('INSERT INTO cv_download_tracking (user_id, download_count, document_download_count, last_download_time) VALUES (?,1,0,NOW())', [user.id]).catch(() => null);
   }
-  return new Response(await fs.readFile(file), { headers: { 'content-type': TYPES[ext] || 'application/octet-stream', 'content-disposition': `${download ? 'attachment' : 'inline'}; filename="${path.basename(file)}"`, 'cache-control': 'private, max-age=300' } });
+  const bytes = await fs.readFile(file);
+  const type = bytes.subarray(0, 5).toString() === '%PDF-' ? TYPES.pdf : TYPES[ext] || 'application/octet-stream';
+  const name = path.basename(file);
+  const fallback = name.replace(/[^\x20-\x7E]|["\\]/g, '_');
+  return new Response(bytes, { headers: { 'content-type': type, 'content-disposition': `${download ? 'attachment' : 'inline'}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(name).replace(/['()*]/g, c => '%' + c.charCodeAt(0).toString(16))}`, 'cache-control': 'private, max-age=300', 'x-content-type-options': 'nosniff' } });
 });
 export const dynamic = 'force-dynamic';
