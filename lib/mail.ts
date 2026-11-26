@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import { one, query } from './db';
 import { getSettings, type Settings } from './settings';
 import { emailList, legacyEmail, routeRecipients, routeEmailReferences, type EmailRoute } from './email-routing';
+export { fillTemplate } from './template-content';
 
 /** SMTP comes from .env, or from the `email_settings` table row of the given type (managed in Administration → SMTP settings). */
 async function transport(settings: Settings, type?: string) {
@@ -40,8 +41,4 @@ export function renderBrandedEmail(s: Settings, body: string) {
   <tr><td style="padding:28px;font-size:15px;line-height:1.6">${body.replace(/class="btn"/g, 'style="display:inline-block;background:#00297B;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600"')}</td></tr>
   <tr><td style="padding:16px 28px;font-size:12px;color:#576E9A;border-top:1px solid #E5EAF3">${s.brand_name} · ${s.support_email || ''}</td></tr>
   </table></td></tr></table></body></html>`;
-}
-/** Replace {{variable}} or {variable} placeholders used by stored templates. */
-export function fillTemplate(tpl: string, vars: Record<string, any>) {
-  return String(tpl || '').replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}|\{([A-Za-z0-9_]+)\}/g, (m, a, b) => { const k = a || b; return k in vars ? String(vars[k] ?? '') : m; });
 }

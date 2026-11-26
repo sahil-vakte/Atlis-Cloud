@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { UPLOAD_ROOT } from './storage';
 import type { ModuleDef } from './modules';
+import { fetchLegacyCv, legacyCvKey } from './legacy-cv';
 
 /** Where the old Laravel app kept uploads (copy laravel/public/uploads here, or point the env var at it). */
 export const LEGACY_ROOT = path.resolve(process.env.LEGACY_UPLOAD_DIR || './storage/legacy-uploads');
@@ -26,8 +27,8 @@ const fill = (tpl: string, row: any) => tpl.replace(/\{(\w+)\}/g, (_, k) => Stri
 const strip = (p: string) => p.replace(/^\/+/, '').replace(/^public\//, '').replace(/^uploads\//, '');
 
 export async function resolveRecordFile(m: ModuleDef, row: any, col: string): Promise<string | null> {
-  const v = String(row[col] ?? '').trim();
-  if (!v) return null;
+  const v = String(row[col] ?? '').trim().replace(/\\/g, '/');
+  if (!v || v.toUpperCase() === 'NULL' || v.split('/').includes('..')) return null;
   const rels: string[] = [];
   if (v.includes('/')) rels.push(strip(v));
   const NAME_COLS = ['documentTitle', 'fileName', 'uploadedDoc', 'documentName', 'docFileName', 'signedContractFileName'];
@@ -42,9 +43,10 @@ export async function resolveRecordFile(m: ModuleDef, row: any, col: string): Pr
   for (const root of [UPLOAD_ROOT, LEGACY_ROOT]) {
     for (const rel of rels) {
       const full = path.resolve(root, rel);
-      if (!full.startsWith(root)) continue;
+      if (!full.startsWith(root + path.sep)) continue;
       try { const st = await fs.stat(full); if (st.isFile()) return full; } catch { /* try next */ }
     }
   }
-  return null;
+  const key = legacyCvKey(m.key, row, col);
+  return key ? fetchLegacyCv(key) : null;
 }

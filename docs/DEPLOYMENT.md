@@ -38,4 +38,14 @@ curl --fail http://127.0.0.1:3000/api/health
 
 Certificates for `atlis.cloud` and `www.atlis.cloud` are managed by Certbot. `certbot-renew.timer` renews them automatically; the deploy hook validates and reloads Nginx. HTTP ACME challenges are served from `/usr/share/nginx/html`.
 
+## Legacy CV storage
+
+The server's local S3 backup is connected through `LEGACY_CV_BACKUP_DIR=/s3/candidates.resume` (24 November 2026). It contains `<profile ID>/<filename>` paths and is checked before cloud access. The application reads these files in place, after record authorization; no AWS credentials or public static-file route are needed. Keep the backup readable by `atlisapp` and outside the web root.
+
+Local CVs are resolved from `UPLOAD_DIR` and `LEGACY_UPLOAD_DIR`. The former Laravel production application also stored CVs in S3 under `<profile ID>/<filename>`; copying the local uploads folder does not include those objects.
+
+To restore access, configure `LEGACY_CV_S3_BUCKET`, `AWS_REGION`, and valid AWS read credentials in `/etc/atlis-cloud.env` (or another AWS default-chain provider accessible to `atlisapp`). Restrict access to `s3:GetObject` for the CV bucket/prefix, with KMS decrypt permission only if those objects require it. Restart the application after updating configuration. Do not commit credentials. The previous Laravel key returned `InvalidAccessKeyId` during verification on 22 November 2026 and must be replaced by the bucket owner.
+
+The application checks record permissions before reading cloud CVs, caches fetched files privately in `UPLOAD_DIR/legacy-cv-cache`, and never exposes credentials or signed storage URLs to the browser. Fetches incur normal S3 request/data-transfer charges; cached reads stay local. Validate a known object such as `136264/MuraliKrishnaRaoPodishetti.pdf` after access is restored. A missing object requires the original file or backup; a database filename alone cannot recreate the CV.
+
 Notification emails also controls the sender address and display name. Legacy contact references in email templates use the same replacement rules as To/CC/BCC. AC entity codes replace the old TQ codes consistently in entity settings and reminder mappings; original email addresses are retained only as routing references.

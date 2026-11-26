@@ -331,7 +331,7 @@ const simpleMasters: [string, string, string, string, Record<string, string>?][]
   ['master-ir35', 'IR35 statuses', 'master_ir35', 'IR35', { region_id: 'region' }],
   ['master-regions', 'Regions', 'master_regions', 'regionName'],
   ['master-country', 'Countries', 'master_country', 'countryName'],
-  ['master-country-dial', 'Country dial codes', 'master_country_cpp', 'country'],
+  ['master-country-dial', 'Country dial codes', 'master_country', 'countryName'],
   ['master-entity', 'Entities', 'master_entity', 'entityName'],
   ['master-services', 'Services', 'master_services', 'serviceName', { parentID: 'service', mainparentID: 'service' }],
   ['master-incentive', 'Revised incentive structure', 'revised_incentive_structure', 'closureType'],
@@ -354,7 +354,7 @@ const simpleMasters: [string, string, string, string, Record<string, string>?][]
 const masters: ModuleDef[] = simpleMasters.map(([key, label, table, titleField, lk]) => ({
   key, label, singular: label.replace(/ies$/, 'y').replace(/s$/, ''), table, group: 'Masters', perms: ['psMaster'], titleField,
   softDelete: ['master_services'].includes(table) ? 'is_deleted' : ['master_supplier'].includes(table) ? null : 'deleted',
-  listColumns: [], searchColumns: [titleField], lookups: { status: 'opt:status', assignedUserID: 'user', ...(lk || {}) },
+  listColumns: [], searchColumns: table === 'master_country' ? [titleField, 'countryCode', 'countryDialCode'] : [titleField], lookups: { status: 'opt:status', assignedUserID: 'user', ...(lk || {}) },
   filters: table === 'app_options' ? ['group_key'] : Object.keys(lk || {}).slice(0, 3),
 }));
 

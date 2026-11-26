@@ -7,6 +7,7 @@ import { scheduleCrmSync } from './avrix-crm';
 
 /** Saving these sends the prospect to the Avrix CRM hub (when AVRIX_CRM_* is configured). */
 const CRM_TABLES = new Set(['prospects', 'prospects_contact']);
+import { fullTextPrefix, searchPattern, searchTerms } from './search';
 
 const NEVER_WRITABLE = new Set(['password', 'pass_word', 'emailKey', 'tokenLogin', 'otp', 'otpToken', 'candidatePassword']);
 
@@ -39,6 +40,7 @@ function scopeSql(m: ModuleDef, u: SessionUser) {
 export type ListParams = {
   page?: number; pageSize?: number; q?: string; sort?: string; dir?: 'asc' | 'desc';
   filters?: Record<string, string>; archived?: boolean; fk?: { column: string; value: string };
+  includeTotal?: boolean;
 };
 
 function buildWhere(m: ModuleDef, t: Table, u: SessionUser, p: ListParams) {
@@ -62,11 +64,20 @@ function buildWhere(m: ModuleDef, t: Table, u: SessionUser, p: ListParams) {
   if (dateCol && p.filters?.created_at__from) { where.push(`${ident(dateCol)}>=?`); params.push(p.filters.created_at__from); }
   if (dateCol && p.filters?.created_at__to) { where.push(`${ident(dateCol)}<=?`); params.push(p.filters.created_at__to + ' 23:59:59'); }
   if (p.q && p.q.trim()) {
-    const terms = p.q.trim().split(/\s+/).slice(0, 6);
+    const terms = searchTerms(p.q);
     const cols = [...new Set([...m.searchColumns, t.pk, m.titleField])].filter((c) => hasColumn(t, c));
     for (const term of terms) {
-      where.push('(' + cols.map((c) => `${ident(c)} LIKE ?`).join(' OR ') + ')');
-      cols.forEach(() => params.push(`%${term}%`));
+      const clauses: string[] = [];
+      for (const c of cols) {
+        if (t.name === 'profile' && c === 'cvContent') {
+          // CV text has an existing FULLTEXT index. Avoid scanning every full CV for names.
+          const prefix = fullTextPrefix(term);
+          if (/^\d+$/.test(term)) continue;
+          if (prefix) { clauses.push(`MATCH(${ident(c)}) AGAINST (? IN BOOLEAN MODE)`); params.push(prefix); continue; }
+        }
+        clauses.push(`${ident(c)} LIKE ? ESCAPE '!'`); params.push(searchPattern(term));
+      }
+      where.push('(' + clauses.join(' OR ') + ')');
     }
   }
   return { sql: where.length ? 'WHERE ' + where.join(' AND ') : '', params };
@@ -81,7 +92,7 @@ export async function listRecords(m: ModuleDef, u: SessionUser, p: ListParams) {
   if (p.sort && hasColumn(t, p.sort)) order = `${ident(p.sort)} ${p.dir === 'asc' ? 'ASC' : 'DESC'}`;
   const cols = [...new Set([t.pk, m.titleField, ...listColumnsFor(m)])].filter((c) => hasColumn(t, c));
   const rows = await query(`SELECT ${cols.map(ident).join(',')} FROM ${ident(t.name)} ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, pageSize, (page - 1) * pageSize]);
-  const total = (await one<{ n: number }>(`SELECT COUNT(*) n FROM ${ident(t.name)} ${sql}`, params))?.n ?? 0;
+  const total = p.includeTotal === false ? rows.length : (await one<{ n: number }>(`SELECT COUNT(*) n FROM ${ident(t.name)} ${sql}`, params))?.n ?? 0;
   await attachLabels(m, rows);
   return { rows, total: Number(total), page, pageSize, columns: cols };
 }
@@ -241,9 +252,9 @@ export async function lookupOptions(key: string, q = '', limit = 50, ids?: strin
   const where: string[] = [];
   if (l.where) where.push(l.where);
   if (ids?.length) { where.push(`${ident(l.value)} IN (${ids.map(() => '?').join(',')})`); params.push(...ids); }
-  else if (q) { where.push(`${l.label} LIKE ?`); params.push(`%${q}%`); }
+  else for (const term of searchTerms(q)) { where.push(`(${l.label} LIKE ? ESCAPE '!' OR CAST(${ident(l.value)} AS CHAR)=?)`); params.push(searchPattern(term), term); }
   const sql = `SELECT ${ident(l.value)} value, ${l.label} label FROM ${ident(l.table)} ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY ${l.order || 'label'} LIMIT ?`;
-  params.push(limit);
+  params.push(Number.isFinite(limit) ? Math.min(500, Math.max(1, Math.floor(limit))) : 50);
   return query<{ value: string; label: string }>(sql, params);
 }
 
