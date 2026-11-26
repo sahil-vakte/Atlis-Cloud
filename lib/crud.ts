@@ -3,6 +3,10 @@ import { getTable, hasColumn, col, SYSTEM_COLUMNS, type Table, type Column, isNu
 import { resolveLookup } from './lookups';
 import type { ModuleDef } from './modules';
 import type { SessionUser } from './session';
+import { scheduleCrmSync } from './avrix-crm';
+
+/** Saving these sends the prospect to the Avrix CRM hub (when AVRIX_CRM_* is configured). */
+const CRM_TABLES = new Set(['prospects', 'prospects_contact']);
 
 const NEVER_WRITABLE = new Set(['password', 'pass_word', 'emailKey', 'tokenLogin', 'otp', 'otpToken', 'candidatePassword']);
 
@@ -195,6 +199,7 @@ export async function createRecord(m: ModuleDef, u: SessionUser, data: Record<st
     throw Object.assign(new Error('You can only add records for your own account'), { status: 403 });
   }
   await logActivity(u, m, id, 'created');
+  if (CRM_TABLES.has(m.table)) scheduleCrmSync();
   return id;
 }
 
@@ -208,6 +213,7 @@ export async function updateRecord(m: ModuleDef, u: SessionUser, id: string, dat
   if (!keys.length) return;
   await exec(`UPDATE ${ident(t.name)} SET ${keys.map((k) => `${ident(k)}=?`).join(',')} WHERE ${ident(t.pk)}=?`, [...keys.map((k) => row[k]), id]);
   await logActivity(u, m, id, `updated ${keys.slice(0, 8).join(', ')}${keys.length > 8 ? '…' : ''}`);
+  if (CRM_TABLES.has(m.table)) scheduleCrmSync();
 }
 
 export async function deleteRecord(m: ModuleDef, u: SessionUser, id: string) {

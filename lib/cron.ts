@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { exec, one, query } from './db';
 import { sendMail, renderBrandedEmail } from './mail';
 import { getSettings } from './settings';
+import { crmSync } from './avrix-crm';
 
 const daysList = (s: string | undefined, def: number[]) => (s ? s.split(',').map((x) => Number(x.trim())).filter((n) => !isNaN(n)) : def);
 const toDate = (v: any) => { if (!v) return null; const s = String(v); const m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/); const d = new Date(m ? `${m[3]}-${m[2]}-${m[1]}` : s.slice(0, 10)); return isNaN(d.getTime()) ? null : d; };
@@ -117,5 +118,6 @@ export async function documentExpiry() {
 
 export const JOBS: Record<string, (force?: boolean) => Promise<any>> = {
   'contract-expiry': contractExpiry, 'po-expiry': poExpiry, 'timesheet-reminder': timesheetReminder, 'no-due-consent': noDueConsent, 'document-expiry': documentExpiry,
+  'crm-sync': crmSync,
   all: async () => ({ contract: await contractExpiry(), po: await poExpiry(), timesheet: await timesheetReminder(), noDue: await noDueConsent(), documents: await documentExpiry() }),
 };
