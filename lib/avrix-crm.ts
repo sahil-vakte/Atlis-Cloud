@@ -12,8 +12,9 @@ const CURSOR = 'avrix_crm_sync_cursor';
 
 export const crmEnabled = () => !!(process.env.AVRIX_CRM_URL && process.env.AVRIX_CRM_KEY && process.env.AVRIX_CRM_SECRET);
 
-async function post(payload: unknown, idempotencyKey: string) {
+async function post(payload: unknown) {
   const body = JSON.stringify(payload);
+  const idempotencyKey = 'atlis-' + crypto.createHash('sha256').update(body).digest('hex');
   const ts = Math.floor(Date.now() / 1000).toString();
   const sig = crypto.createHmac('sha256', process.env.AVRIX_CRM_SECRET!).update(`${ts}.${body}`).digest('hex');
   const res = await fetch(`${process.env.AVRIX_CRM_URL!.replace(/\/$/, '')}/api/intake/leads`, {
@@ -42,16 +43,20 @@ function stageFor(p: any): string | undefined {
   return ps && isNaN(Number(ps)) ? ps : undefined; // a stage name the CRM knows is applied; anything else is ignored
 }
 
-export async function crmSync(force = false) {
+async function runCrmSync(force = false) {
   if (!crmEnabled()) return { skipped: 'AVRIX_CRM_URL / AVRIX_CRM_KEY / AVRIX_CRM_SECRET not set' };
   const started = (await one<{ n: string }>('SELECT NOW() n'))!.n;
   const since = force ? '1970-01-01 00:00:00' : (await one<{ v: string }>('SELECT setting_value v FROM app_settings WHERE setting_key=?', [CURSOR]))?.v ?? '1970-01-01 00:00:00';
+  let sent = 0, checked = 0, lastId = 0; const failed: number[] = [];
+  for (;;) {
   const rows = await query<any>(
-    `SELECT p.* FROM prospects p WHERE p.deleted=0 AND (COALESCE(p.updated_at, p.created_at) > ?
+    `SELECT p.* FROM prospects p WHERE p.deleted=0 AND p.id > ? AND (COALESCE(p.updated_at, p.created_at) > ?
        OR EXISTS (SELECT 1 FROM prospects_contact pc WHERE pc.prospectID=p.id AND pc.deleted=0 AND COALESCE(pc.updated_at, pc.created_at) > ?))
-     ORDER BY p.id LIMIT 1000`, [since, since]);
-  let sent = 0; const failed: number[] = [];
+     ORDER BY p.id LIMIT 100`, [lastId, since, since]);
+  if (!rows.length) break;
+  checked += rows.length;
   for (const p of rows) {
+    lastId = p.id;
     const contact = await one<any>(
       `SELECT * FROM prospects_contact WHERE prospectID=? AND deleted=0 ORDER BY (isKeyContact=1) DESC, (COALESCE(email, workEmail, '') <> '') DESC, prospectContactID LIMIT 1`, [p.id]);
     const email = (contact?.email || contact?.workEmail || p.email || '').trim().toLowerCase() || undefined;
@@ -72,13 +77,22 @@ export async function crmSync(force = false) {
           msaEndDate: p.msaCurrentEndDate || undefined,
         },
         tags: ['atlis-prospect'],
-      }, `atlis-prospect-${p.id}-${String(p.updated_at ?? p.created_at ?? '')}`);
+      });
       sent++;
     } catch { failed.push(p.id); }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
   }
   // Only move the cursor forward when everything went through, so failures are retried next run.
   if (!failed.length) await setCursor(started);
-  return { since, checked: rows.length, sent, failed: failed.length };
+  return { since, checked, sent, failed: failed.length };
+}
+
+// Coalesce overlapping manual, scheduled and save-triggered syncs in this process.
+let inFlight: Promise<Awaited<ReturnType<typeof runCrmSync>>> | null = null;
+export function crmSync(force = false) {
+  if (!inFlight) inFlight = runCrmSync(force).finally(() => { inFlight = null; });
+  return inFlight;
 }
 
 /** Called after a prospect or prospect contact is saved: runs a sync a few seconds later (one at a time). */
