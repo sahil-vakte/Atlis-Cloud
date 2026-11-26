@@ -1,13 +1,12 @@
+import { scheduleCrmSync } from './avrix-crm';
+const CRM_TABLES = new Set(['prospects', 'prospects_contact']);
 import { exec, ident, one, query } from './db';
 import { getTable, hasColumn, col, SYSTEM_COLUMNS, type Table, type Column, isNumberType, isDateType } from './schema';
 import { resolveLookup } from './lookups';
+import { consultantDisplayFields } from './consultant-context';
 import type { ModuleDef } from './modules';
 import type { SessionUser } from './session';
-import { scheduleCrmSync } from './avrix-crm';
-
-/** Saving these sends the prospect to the Avrix CRM hub (when AVRIX_CRM_* is configured). */
-const CRM_TABLES = new Set(['prospects', 'prospects_contact']);
-import { fullTextPrefix, searchPattern, searchTerms } from './search';
+import { booleanExpression, fullTextPrefix, searchPattern, searchTerms } from './search';
 
 const NEVER_WRITABLE = new Set(['password', 'pass_word', 'emailKey', 'tokenLogin', 'otp', 'otpToken', 'candidatePassword']);
 
@@ -38,12 +37,12 @@ function scopeSql(m: ModuleDef, u: SessionUser) {
 }
 
 export type ListParams = {
-  page?: number; pageSize?: number; q?: string; sort?: string; dir?: 'asc' | 'desc';
+  page?: number; pageSize?: number; q?: string; booleanSearch?: boolean; sort?: string; dir?: 'asc' | 'desc';
   filters?: Record<string, string>; archived?: boolean; fk?: { column: string; value: string };
   includeTotal?: boolean;
 };
 
-function buildWhere(m: ModuleDef, t: Table, u: SessionUser, p: ListParams) {
+async function buildWhere(m: ModuleDef, t: Table, u: SessionUser, p: ListParams) {
   const where: string[] = [];
   const params: any[] = [];
   if (m.baseWhere) where.push(`(${m.baseWhere})`);
@@ -55,8 +54,59 @@ function buildWhere(m: ModuleDef, t: Table, u: SessionUser, p: ListParams) {
     params.push(p.fk.value, p.fk.value);
   }
   for (const [k, v] of Object.entries(p.filters || {})) {
-    if (v === '' || v == null || !hasColumn(t, k)) continue;
+    if (v === '' || v == null) continue;
+    if (m.key === 'profiles' && k === 'designationKeyword') {
+      const phrases = [...new Set(v.split('/').map((term) => term.trim()).filter(Boolean))].slice(0, 10);
+      if (phrases.length) {
+        const clauses = phrases.map(() => "d.designationName LIKE ? ESCAPE '!'");
+        where.push('(EXISTS (SELECT 1 FROM master_designation d WHERE d.designationID=profile.designationID AND (' + clauses.join(' OR ') + '))');
+        params.push(...phrases.map(searchPattern));
+        const cv = phrases.flatMap((phrase) => {
+          const words = phrase.match(/[\p{L}\p{N}]+/gu);
+          return words?.some((word) => word.length >= 3) ? ['"' + words.join(' ') + '"'] : [];
+        });
+        if (cv.length) {
+          where[where.length - 1] += ' OR MATCH(cvContent) AGAINST (? IN BOOLEAN MODE)';
+          params.push(cv.join(' '));
+        }
+        where[where.length - 1] += ')';
+      }
+      continue;
+    }
+    if (!hasColumn(t, k)) continue;
     if (k.endsWith('__from') || k.endsWith('__to')) continue;
+    if (m.key === 'profiles' && ['nationality', 'skillset', 'designationID'].includes(k)) {
+      const ids = [...new Set((k === 'skillset' ? v.split(',') : [v]).map((id) => id.trim()).filter((id) => /^\d+$/.test(id)))];
+      if (!ids.length) { where.push('0=1'); continue; }
+      if (ids.length > 30) throw Object.assign(new Error('Select up to 30 skills.'), { status: 400 });
+      const lookup = resolveLookup(m.lookups![k])!;
+      const options = await query<{ id: number; label: string }>(
+        'SELECT ' + ident(lookup.value) + ' id, ' + lookup.label + ' label FROM ' + ident(lookup.table) +
+        ' WHERE ' + ident(lookup.value) + ' IN (' + ids.map(() => '?').join(',') + ')', ids);
+      const clauses: string[] = [];
+      if (k === 'nationality') {
+        const label = options[0]?.label;
+        const legacy = label === 'Dutch' ? ['Dutch Citizen', 'Dutch National', 'Dutch (NL)'] : [];
+        const accepted = [...ids, ...(label ? [label, ...legacy] : [])];
+        clauses.push(ident(k) + ' IN (' + accepted.map(() => '?').join(',') + ')');
+        params.push(...accepted);
+      } else {
+        for (const id of ids) {
+          clauses.push(k === 'skillset' ? "FIND_IN_SET(?, REPLACE(skillset,' ',''))" : 'designationID=?');
+          params.push(id);
+        }
+        const phrases = options.flatMap(({ label }) => {
+          const words = label?.match(/[\p{L}\p{N}]+/gu);
+          return words?.some((word) => word.length >= 3) ? ['"' + words.join(' ') + '"'] : [];
+        });
+        if (phrases.length) {
+          clauses.push('MATCH(cvContent) AGAINST (? IN BOOLEAN MODE)');
+          params.push(phrases.join(' '));
+        }
+      }
+      where.push('(' + clauses.join(' OR ') + ')');
+      continue;
+    }
     if (m.multi?.includes(k)) { where.push(`FIND_IN_SET(?, REPLACE(${ident(k)},' ',''))`); params.push(v); }
     else { where.push(`${ident(k)}=?`); params.push(v); }
   }
@@ -64,9 +114,9 @@ function buildWhere(m: ModuleDef, t: Table, u: SessionUser, p: ListParams) {
   if (dateCol && p.filters?.created_at__from) { where.push(`${ident(dateCol)}>=?`); params.push(p.filters.created_at__from); }
   if (dateCol && p.filters?.created_at__to) { where.push(`${ident(dateCol)}<=?`); params.push(p.filters.created_at__to + ' 23:59:59'); }
   if (p.q && p.q.trim()) {
-    const terms = searchTerms(p.q);
+    const display = consultantDisplayFields(t.name, u);
     const cols = [...new Set([...m.searchColumns, t.pk, m.titleField])].filter((c) => hasColumn(t, c));
-    for (const term of terms) {
+    const matchTerm = (term: string, total = false) => {
       const clauses: string[] = [];
       for (const c of cols) {
         if (t.name === 'profile' && c === 'cvContent') {
@@ -75,23 +125,31 @@ function buildWhere(m: ModuleDef, t: Table, u: SessionUser, p: ListParams) {
           if (/^\d+$/.test(term)) continue;
           if (prefix) { clauses.push(`MATCH(${ident(c)}) AGAINST (? IN BOOLEAN MODE)`); params.push(prefix); continue; }
         }
-        clauses.push(`${ident(c)} LIKE ? ESCAPE '!'`); params.push(searchPattern(term));
+        clauses.push(`${display[c] || ident(c)} LIKE ? ESCAPE '!'`); params.push(searchPattern(term));
       }
-      where.push('(' + clauses.join(' OR ') + ')');
-    }
+      const expression = '(' + clauses.join(' OR ') + ')';
+      return total ? 'COALESCE(' + expression + ',0)' : expression;
+    };
+    if (m.key === 'profiles' && p.booleanSearch) where.push(booleanExpression(p.q, (term) => matchTerm(term, true)));
+    else for (const term of searchTerms(p.q)) where.push(matchTerm(term));
   }
   return { sql: where.length ? 'WHERE ' + where.join(' AND ') : '', params };
+}
+
+function displayColumns(columns: string[], display: Record<string, string>) {
+  return columns.map((column) => display[column] ? display[column] + ' AS ' + ident(column) : ident(column)).join(',');
 }
 
 export async function listRecords(m: ModuleDef, u: SessionUser, p: ListParams) {
   const t = getTable(m.table);
   const page = Math.max(1, p.page || 1);
   const pageSize = Math.min(500, Math.max(5, p.pageSize || 25));
-  const { sql, params } = buildWhere(m, t, u, p);
+  const { sql, params } = await buildWhere(m, t, u, p);
+  const display = consultantDisplayFields(t.name, u);
   let order = m.defaultSort || `${t.pk} DESC`;
-  if (p.sort && hasColumn(t, p.sort)) order = `${ident(p.sort)} ${p.dir === 'asc' ? 'ASC' : 'DESC'}`;
+  if (p.sort && hasColumn(t, p.sort)) order = `${display[p.sort] || ident(p.sort)} ${p.dir === 'asc' ? 'ASC' : 'DESC'}`;
   const cols = [...new Set([t.pk, m.titleField, ...listColumnsFor(m)])].filter((c) => hasColumn(t, c));
-  const rows = await query(`SELECT ${cols.map(ident).join(',')} FROM ${ident(t.name)} ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, pageSize, (page - 1) * pageSize]);
+  const rows = await query(`SELECT ${displayColumns(cols, display)} FROM ${ident(t.name)} ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, pageSize, (page - 1) * pageSize]);
   const total = p.includeTotal === false ? rows.length : (await one<{ n: number }>(`SELECT COUNT(*) n FROM ${ident(t.name)} ${sql}`, params))?.n ?? 0;
   await attachLabels(m, rows);
   return { rows, total: Number(total), page, pageSize, columns: cols };
@@ -99,10 +157,10 @@ export async function listRecords(m: ModuleDef, u: SessionUser, p: ListParams) {
 
 export async function exportRecords(m: ModuleDef, u: SessionUser, p: ListParams) {
   const t = getTable(m.table);
-  const { sql, params } = buildWhere(m, t, u, p);
+  const { sql, params } = await buildWhere(m, t, u, p);
   const hidden = new Set([...(m.hidden || []), ...NEVER_WRITABLE]);
   const cols = t.columns.map((c) => c.name).filter((c) => !hidden.has(c));
-  const rows = await query(`SELECT ${cols.map(ident).join(',')} FROM ${ident(t.name)} ${sql} ORDER BY ${m.defaultSort || t.pk + ' DESC'} LIMIT 50000`, params);
+  const rows = await query(`SELECT ${displayColumns(cols, consultantDisplayFields(t.name, u))} FROM ${ident(t.name)} ${sql} ORDER BY ${m.defaultSort || t.pk + ' DESC'} LIMIT 50000`, params);
   await attachLabels(m, rows);
   return { rows, cols };
 }
@@ -114,10 +172,25 @@ export async function getRecord(m: ModuleDef, u: SessionUser, id: string) {
   if (m.baseWhere) where.push(`(${m.baseWhere})`);
   const s = scopeSql(m, u);
   if (s) { where.push(`(${s.sql})`); params.push(...s.params); }
-  const row = await one(`SELECT * FROM ${ident(t.name)} WHERE ${where.join(' AND ')}`, params);
+  const display = Object.entries(consultantDisplayFields(t.name, u));
+  const computed = display.map(([column, sql]) => ', ' + sql + ' AS ' + ident('__display_' + column)).join('');
+  const row = await one<Record<string, any>>(`SELECT *${computed} FROM ${ident(t.name)} WHERE ${where.join(' AND ')}`, params);
   if (!row) return null;
   for (const k of NEVER_WRITABLE) delete (row as any)[k];
-  await attachLabels(m, [row]);
+  if (display.length) {
+    const resolved: Record<string, unknown> = {};
+    for (const [column] of display) {
+      const key = '__display_' + column;
+      if (row[key] != null) resolved[column] = row[key];
+      delete row[key];
+    }
+    const displayRow: Record<string, any> = { ...row, ...resolved };
+    await attachLabels(m, [displayRow]);
+    row.__labels = displayRow.__labels;
+    row.__display = resolved;
+  } else {
+    await attachLabels(m, [row]);
+  }
   return row;
 }
 
@@ -188,6 +261,11 @@ async function nextPk(t: Table) {
 }
 
 export async function createRecord(m: ModuleDef, u: SessionUser, data: Record<string, any>) {
+  if (m.key === 'profiles') {
+    const name = typeof data?.name === 'string' ? data.name.trim() : '';
+    if (!name || /^null$/i.test(name)) throw Object.assign(new Error('Enter a name before saving the profile.'), { status: 400 });
+    data = { ...data, name };
+  }
   const t = getTable(m.table);
   const own: Record<string, any> = {};
   if (m.scope?.(u) && m.ownerConsultantCol && !data[m.ownerConsultantCol] && (u.role === 16 || u.role === 3) && u.profileID) {

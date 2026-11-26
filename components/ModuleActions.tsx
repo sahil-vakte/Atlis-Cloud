@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import type { McpClientDetails } from './McpSetupPanel';
 import { useEffect, useState } from 'react';
 import * as L from './icons';
 import { api, recordFileUrl, fmtDate } from '@/lib/client';
@@ -8,7 +9,7 @@ import { Empty, Loading, Modal, Spinner, StatusBadge, useToast } from './ui';
 
 const VERIFY = new Set(['timesheets', 'invoices', 'expenses', 'expense-lines', 'client-invoices', 'candidate-documents', 'company-documents', 'sub-vendor-documents']);
 
-export default function ModuleActions({ module, row, reload }: { module: string; row: any; reload: () => void }) {
+export default function ModuleActions({ module, row, reload, onMcpSetup }: { module: string; row: any; reload: () => void; onMcpSetup?: (client: McpClientDetails | null) => void }) {
   const toast = useToast();
   const [modal, setModal] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,6 +44,16 @@ export default function ModuleActions({ module, row, reload }: { module: string;
     buttons.push(<button key="rj" className="btn-outline text-red-700" onClick={() => setModal('reject')}><L.X className="h-4 w-4" /> Reject</button>);
   }
   if (module === 'email-templates' || module === 'pscare-templates') buttons.push(<button key="se" className="btn-accent" onClick={() => setModal('email')}><L.Send className="h-4 w-4" /> Send email</button>);
+  if (module === 'users' && row.__mcp && (row.__mcp.eligible || row.__mcp.enabled)) {
+    buttons.push(<button key="mcp" type="button" className="btn-outline" disabled={busy} onClick={() => run(async () => {
+      const result = await api('/api/users/' + row.id + '/mcp', { method: 'POST', json: { enabled: !row.__mcp.enabled } });
+      onMcpSetup?.(result.client || null);
+      return result;
+    })}>
+      {row.__mcp.enabled ? 'Disable MCP' : 'Enable MCP'}
+    </button>);
+  }
+
   if (module === 'users') buttons.push(<button key="pw" className="btn-outline" onClick={() => setModal('password')}><L.KeyRound className="h-4 w-4" /> Set password</button>);
 
   return (

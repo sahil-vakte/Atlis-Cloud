@@ -38,6 +38,10 @@ export default function RecordForm({ module, id }: { module: string; id?: string
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (module === 'profiles' && !id && (typeof values.name !== 'string' || !values.name.trim() || /^null$/i.test(values.name.trim()))) {
+      setError('Enter a name before saving the profile.');
+      return;
+    }
     setSaving(true); setError('');
     try {
       const payload: Record<string, any> = {};

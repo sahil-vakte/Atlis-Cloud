@@ -20,6 +20,9 @@ export async function POST(req: Request) {
   if (f.get('consent') !== 'on' && f.get('consent') !== 'true') return Response.json({ message: 'Please accept the privacy notice.' }, { status: 400 });
   if (file.size > 10 * 1024 * 1024) return Response.json({ message: 'CV must be under 10 MB.' }, { status: 400 });
   const job = jobId ? await one<any>('SELECT rID, client, regionID, teamID, assignUserID FROM requirement WHERE rID=? AND deleted=0 AND active=1 AND publish=1', [jobId]) : null;
+  if (jobId && (!/^[1-9]\d{0,9}$/.test(jobId) || !job)) {
+    return Response.json({ message: 'This role is no longer accepting applications.' }, { status: 404 });
+  }
   const saved = await saveUpload('cv-pending/public', file);
   const { data } = await parseFile(file.name, saved.buffer);
   const row: any = await toProfileRow(data);

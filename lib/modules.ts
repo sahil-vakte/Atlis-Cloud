@@ -185,45 +185,55 @@ const recruitment: ModuleDef[] = [
   { key: 'internships', label: 'Internship applications', singular: 'Application', table: 'internship', group: 'Recruitment', perms: ['profile'], titleField: 'name', softDelete: null, listColumns: ['id', 'name', 'email', 'phoneNo', 'collageName', 'degree', 'internshipRole', 'created_at'], searchColumns: ['name', 'email', 'collageName'] },
 ];
 
-const psCare: ModuleDef[] = [
-  {
-    key: 'consultants', label: 'Contract Closures', singular: 'Consultant', table: 'candidate_data', group: 'PS Care', icon: 'handshake',
-    perms: ['contract-closures', 'pscare_contractClosure', 'umbrella-contracts-list', 'sub-vendor-engagements', 'ownCompany-my-contract'], actionPrefix: 'contractClosure', titleField: 'candidateName', softDelete: null, defaultSort: 'cdID DESC',
-    listColumns: ['cdID', 'profileID', 'candidateName', 'candidateEmailID', 'role', 'endClient', 'recruiterID', 'jobType', 'startDate', 'endDate', 'candidatureStatus', 'companyID'],
-    searchColumns: ['candidateName', 'candidateEmailID', 'role', 'endClient', 'jobLocation', 'referenceID', 'vendorName'],
-    lookups: { profileID: 'profile', userID: 'user', sourcingID: 'sourcing', companyID: 'company', subVendorID: 'subVendor', pocID: 'poc', recruiterID: 'recruiter', nationalityID: 'nationality', visaStatusID: 'visa', engagementType: 'engagementType', incentiveID: 'incentive', jobType: 'opt:closure_job_type', candidatureStatus: 'opt:closure_status', status: 'opt:status' },
-    filters: ['recruiterID', 'companyID', 'subVendorID', 'pocID', 'jobType', 'candidatureStatus', 'engagementType'],
-    hidden: ['candidatePassword', 'invoiceConsentToken', 'invoiceConsentLinkExpiry', 'quarterKey'],
-    formSections: [
-      { title: 'Engagement', fields: ['candidateName', 'candidateEmailID', 'primaryContactNo', 'role', 'jobType', 'engagementType', 'closerType', 'candidatureStatus', 'startDate', 'endDate', 'jobLocation', 'endClient', 'implementationPartner', 'referenceID'] },
-      { title: 'Links', fields: ['profileID', 'sourcingID', 'recruiterID', 'pocID', 'companyID', 'subVendorID', 'vendorName'] },
-      { title: 'Commercials', fields: ['candidateRate', 'rateBilling', 'IR35Status', 'paymentTerm', 'paymentCycle', 'timesheetCycle', 'dailyMarginGbp', 'marginGbp', 'marginPure', 'marginOutgoing', 'othercost', 'incentiveID'] },
-      { title: 'Access', fields: ['istimesheetAccess', 'isinvoiceAccess', 'isexpensesAccess', 'isvatAccess', 'timesheetReminder'] },
-      { title: 'Personal', fields: ['residentialStreetAddress', 'residentialCity', 'residentialPostCode', 'nationalityID', 'visaStatusID', 'nationalInsuranceNo', 'emergencyContactName', 'emergencyContactNo', 'emergencyContactEmailID'] },
-      { title: 'Limited company', fields: ['regiCompanyName', 'regiCompanyNo', 'regiCompanyVATNo', 'regiCompanyUTR', 'regiCompanyStreetAddress', 'regiCompanyCity', 'regiCompanyPostCode', 'regiCompanyAccountHolderName', 'regiCompanyBankAccountNo', 'regiCompanyBankSortCode', 'regiCompanyBankIBANno', 'regiCompanyBankSWIFTno', 'regiCompanyBankAddr'] },
-      { title: 'Client contacts', fields: ['rmName', 'rmEmail', 'rmMobile', 'spocName', 'spocEmail', 'spocMobile'] },
-    ],
-    related: [
-      { module: 'consultant-progress', fk: 'cdID', label: 'Onboarding progress' },
-      { module: 'timesheets', fk: 'pID', label: 'Timesheets' },
-      { module: 'invoices', fk: 'pID', label: 'Invoices' },
-      { module: 'candidate-documents', fk: 'pID', label: 'Documents' },
-      { module: 'contracts', fk: 'cdID', label: 'Contracts' },
-      { module: 'po-details', fk: 'cdID', label: 'Purchase orders' },
-      { module: 'expenses', fk: 'cdID', label: 'Expenses' },
-      { module: 'client-invoices', fk: 'cdID', label: 'Client invoices' },
-      { module: 'pscare-comments', fk: 'consultantId', label: 'PS Care comments' },
-      { module: 'bank-details', fk: 'cdID', label: 'Bank details' },
-      { module: 'consultant-activity', fk: 'cdID', label: 'Activity' },
-    ],
-    scope: (u) => {
-      if ((u.role === 16 || u.role === 3) && u.profileID) return { sql: 'profileID=?', params: [u.profileID] };
-      if (u.role === 17 && u.companyID) return { sql: 'companyID=?', params: [u.companyID] };
-      if (u.role === 29 && u.subVendorID) return { sql: 'subVendorID=?', params: [u.subVendorID] };
-      return null;
-    },
+const consultantClosure: ModuleDef = {
+  key: 'consultants', label: 'Contract Closures', singular: 'Consultant', table: 'candidate_data', group: 'PS Care', icon: 'handshake',
+  perms: ['contract-closures', 'pscare_contractClosure', 'umbrella-contracts-list', 'sub-vendor-engagements', 'ownCompany-my-contract'], actionPrefix: 'contractClosure', titleField: 'candidateName', softDelete: null, defaultSort: 'cdID DESC',
+  listColumns: ['cdID', 'profileID', 'candidateName', 'candidateEmailID', 'primaryContactNo', 'role', 'jobLocation', 'endClient', 'recruiterID', 'jobType', 'startDate', 'endDate', 'candidatureStatus', 'companyID'],
+  searchColumns: ['candidateName', 'candidateEmailID', 'role', 'endClient', 'jobLocation', 'referenceID', 'vendorName'],
+  lookups: { profileID: 'profile', userID: 'user', sourcingID: 'sourcing', companyID: 'company', subVendorID: 'subVendor', pocID: 'poc', recruiterID: 'recruiter', nationalityID: 'nationality', visaStatusID: 'visa', engagementType: 'engagementType', incentiveID: 'incentive', jobType: 'opt:closure_job_type', candidatureStatus: 'opt:closure_status', status: 'opt:status' },
+  filters: ['recruiterID', 'companyID', 'subVendorID', 'pocID', 'jobType', 'candidatureStatus', 'engagementType'],
+  hidden: ['candidatePassword', 'invoiceConsentToken', 'invoiceConsentLinkExpiry', 'quarterKey'],
+  formSections: [
+    { title: 'Engagement', fields: ['candidateName', 'candidateEmailID', 'primaryContactNo', 'role', 'jobType', 'engagementType', 'closerType', 'candidatureStatus', 'startDate', 'endDate', 'jobLocation', 'endClient', 'implementationPartner', 'referenceID'] },
+    { title: 'Links', fields: ['profileID', 'sourcingID', 'recruiterID', 'pocID', 'companyID', 'subVendorID', 'vendorName'] },
+    { title: 'Commercials', fields: ['candidateRate', 'rateBilling', 'IR35Status', 'paymentTerm', 'paymentCycle', 'timesheetCycle', 'dailyMarginGbp', 'marginGbp', 'marginPure', 'marginOutgoing', 'othercost', 'incentiveID'] },
+    { title: 'Access', fields: ['istimesheetAccess', 'isinvoiceAccess', 'isexpensesAccess', 'isvatAccess', 'timesheetReminder'] },
+    { title: 'Personal', fields: ['residentialStreetAddress', 'residentialCity', 'residentialPostCode', 'nationalityID', 'visaStatusID', 'nationalInsuranceNo', 'emergencyContactName', 'emergencyContactNo', 'emergencyContactEmailID'] },
+    { title: 'Limited company', fields: ['regiCompanyName', 'regiCompanyNo', 'regiCompanyVATNo', 'regiCompanyUTR', 'regiCompanyStreetAddress', 'regiCompanyCity', 'regiCompanyPostCode', 'regiCompanyAccountHolderName', 'regiCompanyBankAccountNo', 'regiCompanyBankSortCode', 'regiCompanyBankIBANno', 'regiCompanyBankSWIFTno', 'regiCompanyBankAddr'] },
+    { title: 'Client contacts', fields: ['rmName', 'rmEmail', 'rmMobile', 'spocName', 'spocEmail', 'spocMobile'] },
+  ],
+  related: [
+    { module: 'consultant-progress', fk: 'cdID', label: 'Onboarding progress' },
+    { module: 'timesheets', fk: 'pID', label: 'Timesheets' },
+    { module: 'invoices', fk: 'pID', label: 'Invoices' },
+    { module: 'candidate-documents', fk: 'pID', label: 'Documents' },
+    { module: 'contracts', fk: 'cdID', label: 'Contracts' },
+    { module: 'po-details', fk: 'cdID', label: 'Purchase orders' },
+    { module: 'expenses', fk: 'cdID', label: 'Expenses' },
+    { module: 'client-invoices', fk: 'cdID', label: 'Client invoices' },
+    { module: 'pscare-comments', fk: 'consultantId', label: 'PS Care comments' },
+    { module: 'bank-details', fk: 'cdID', label: 'Bank details' },
+    { module: 'consultant-activity', fk: 'cdID', label: 'Activity' },
+  ],
+  scope: (u) => {
+    if ((u.role === 16 || u.role === 3) && u.profileID) return { sql: 'profileID=?', params: [u.profileID] };
+    if (u.role === 17 && u.companyID) return { sql: 'companyID=?', params: [u.companyID] };
+    if (u.role === 29 && u.subVendorID) return { sql: 'subVendorID=?', params: [u.subVendorID] };
+    return null;
   },
-  { key: 'permanent-closures', label: 'Permanent Closures', singular: 'Closure', table: 'candidate_data', group: 'PS Care', icon: 'badge-check', perms: ['contract-closures', 'pscare_permanentClosure'], actionPrefix: 'permanentClosure', titleField: 'candidateName', softDelete: null, defaultSort: 'cdID DESC', baseWhere: "jobType LIKE '%Permanent%'", listColumns: ['cdID', 'candidateName', 'role', 'endClient', 'recruiterID', 'startDate', 'candidatureStatus'], searchColumns: ['candidateName', 'candidateEmailID', 'role'], lookups: { recruiterID: 'recruiter', candidatureStatus: 'opt:closure_status', pocID: 'poc' }, filters: ['recruiterID', 'candidatureStatus'], hidden: ['candidatePassword'] },
+};
+
+const psCare: ModuleDef[] = [
+  consultantClosure,
+  {
+    ...consultantClosure,
+    key: 'permanent-closures',
+    label: 'Permanent Closures',
+    singular: 'Closure',
+    perms: ['contract-closures', 'pscare_permanentClosure'],
+    actionPrefix: 'permanentClosure',
+    baseWhere: "(TRIM(jobType)='2' OR jobType LIKE '%Permanent%')",
+  },
   { key: 'consultant-progress', label: 'Onboarding progress', singular: 'Progress', table: 'candidate_progress', group: 'PS Care', perms: ['contract-closures'], titleField: 'cdID', softDelete: null, listColumns: ['id', 'cdID', 'welcome_email', 'documentation', 'contract', 'background_verification', 'invoice_status', 'incentive_status'], searchColumns: [], lookups: { cdID: 'consultant' } },
   { key: 'contracts', label: 'Contracts', singular: 'Contract', table: 'candidate_contract', group: 'PS Care', icon: 'file-signature', perms: ['contract-closures', 'my-contract', 'ownCompany-my-contract', 'umbrella-contracts-list'], titleField: 'contractType', softDelete: null, defaultSort: 'id DESC', listColumns: ['id', 'cdID', 'contractType', 'fromDate', 'toDate', 'rateExpected', 'status', 'created_at'], searchColumns: ['contractType', 'fileName'], lookups: { cdID: 'consultant', cCurrencyID: 'currency', contractType: 'contractType' }, files: ['fileName', 'signedContractFileName'], scope: portal.consultantOf('cdID') },
   { key: 'po-details', label: 'Purchase orders', singular: 'PO', table: 'po_details', group: 'PS Care', perms: ['contract-closures'], titleField: 'po_no', softDelete: null, listColumns: ['id', 'cdID', 'po_no', 'po_start_date', 'po_end_date', 'po_currency', 'po_value', 'status'], searchColumns: ['po_no'], lookups: { cdID: 'consultant', po_currency: 'currency' }, files: ['po_attachment'] },
