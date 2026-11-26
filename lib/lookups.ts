@@ -1,3 +1,5 @@
+import { consultantNameSql } from './consultant-context';
+
 /**
  * Lookup registry: every foreign-key style column in the legacy schema points at one of these.
  * Dropdowns, list labels, filters and exports all resolve through here, so nothing is hardcoded in the UI.
@@ -67,7 +69,7 @@ export const LOOKUPS: Record<string, Lookup> = {
   profile: { table: 'profile', value: 'pID', label: "CONCAT(IFNULL(name,''),' (P',pID,')')", where: 'deleted=0', order: 'name' },
   requirement: { table: 'requirement', value: 'rID', label: "CONCAT(IFNULL(roleName,''),' (R',rID,')')", where: 'deleted=0', order: 'rID DESC' },
   sourcing: { table: 'sourcing', value: 'sID', label: "CONCAT(IFNULL(sourcingName,''),' (S',sID,')')", where: 'deleted=0', order: 'sID DESC' },
-  consultant: { table: 'candidate_data', value: 'cdID', label: "CONCAT(COALESCE(NULLIF(candidateName,''),(SELECT p.name FROM profile p WHERE p.pID=candidate_data.profileID),'Consultant'),' (C',cdID,')')", order: 'cdID DESC' },
+  consultant: { table: 'candidate_data', value: 'cdID', label: "CONCAT(" + consultantNameSql + ",' (C',cdID,')')", order: 'cdID DESC' },
   expense: { table: 'expenserequest', value: 'expID', label: "CONCAT('EXP',expID,' ',IFNULL(expenseMonth,''),' ',IFNULL(expenseYear,''))" },
   contact: { table: 'contact', value: 'contactID', label: "TRIM(CONCAT(IFNULL(firstName,''),' ',IFNULL(lastName,'')))" },
   permissionParent: { table: 'permissions', value: 'id', label: 'name', where: 'parent_id=0' },

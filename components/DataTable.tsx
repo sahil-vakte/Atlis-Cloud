@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as L from './icons';
 import clsx from 'clsx';
 import { api, qs, fmtDate, stripHtml, recordFileUrl } from '@/lib/client';
@@ -10,7 +10,7 @@ import { Empty, Loading, StatusBadge, useConfirm, useToast } from './ui';
 
 export type Meta = {
   key: string; label: string; singular: string; pk: string; titleField: string;
-  listColumns: { name: string; label: string; kind: string }[]; filters: { name: string; label: string; lookup?: string }[];
+  listColumns: { name: string; label: string; kind: string }[]; filters: { name: string; label: string; lookup?: string; multi?: boolean }[];
   fields: any[]; sections: { title: string; fields: string[] }[]; softDelete: boolean; hasCreatedAt: boolean;
   related: { module: string; fk: string; label: string }[]; can: Record<'add' | 'edit' | 'delete' | 'restore' | 'export', boolean>; defaults: Record<string, any>;
 };
@@ -40,6 +40,11 @@ export default function DataTable({ module, fk, compact, title, actions, default
   const [err, setErr] = useState('');
   const [data, setData] = useState<{ rows: any[]; total: number; columns: string[] } | null>(null);
   const [loading, setLoading] = useState(true);
+  const profileList = module === 'profiles' && !compact;
+  const newTab = profileList || (module === 'requirements' && !compact);
+  const [booleanMode, setBooleanMode] = useState(false);
+  const [booleanApplied, setBooleanApplied] = useState(false);
+  const [draftFilters, setDraftFilters] = useState<Record<string, string>>({});
   const [q, setQ] = useState(''); const [dq, setDq] = useState('');
   const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(compact ? 10 : 25);
   const [sort, setSort] = useState<{ c: string; d: 'asc' | 'desc' } | null>(null);
@@ -49,18 +54,30 @@ export default function DataTable({ module, fk, compact, title, actions, default
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [colMenu, setColMenu] = useState(false);
+  const requestVersion = useRef(0);
 
   useEffect(() => { loadMeta(module).then(setMeta).catch((e) => setErr(e.message)); }, [module]);
   useEffect(() => { try { setHidden(new Set(JSON.parse(localStorage.getItem(`atlis_cols_${module}`) || '[]'))); } catch {} }, [module]);
-  useEffect(() => { const t = setTimeout(() => { setDq(q); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
-  const params = useMemo(() => ({ page, pageSize, q: dq, sort: sort?.c, dir: sort?.d, archived: archived ? 1 : undefined, fk: fk?.column, fkv: fk?.value, ...Object.fromEntries(Object.entries(filters).map(([k, v]) => [`f.${k}`, v])) }), [page, pageSize, dq, sort, archived, fk?.column, fk?.value, filters]);
+  useEffect(() => {
+    if (booleanMode) return;
+    const timer = setTimeout(() => { setDq(q); setBooleanApplied(false); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [q, booleanMode]);
+  const updateFilter = (key: string, value: string) => {
+    if (profileList) setDraftFilters((current) => ({ ...current, [key]: value }));
+    else { setFilters((current) => ({ ...current, [key]: value })); setPage(1); }
+  };
+  const filterValues = profileList ? draftFilters : filters;
+  const params = useMemo(() => ({ page, pageSize, q: dq, boolean: booleanApplied ? 1 : undefined, sort: sort?.c, dir: sort?.d, archived: archived ? 1 : undefined, fk: fk?.column, fkv: fk?.value, ...Object.fromEntries(Object.entries(filters).map(([k, v]) => [`f.${k}`, v])) }), [page, pageSize, dq, booleanApplied, sort, archived, fk?.column, fk?.value, filters]);
   const load = useCallback(() => {
+    const version = ++requestVersion.current;
+    setErr('');
     setLoading(true);
-    api(`/api/m/${module}${qs(params)}`).then((r) => { setData(r); setSel(new Set()); }).catch((e) => setErr(e.message)).finally(() => setLoading(false));
+    api(`/api/m/${module}${qs(params)}`).then((r) => { if (version === requestVersion.current) { setData(r); setSel(new Set()); } }).catch((e) => { if (version === requestVersion.current) setErr(e.message); }).finally(() => { if (version === requestVersion.current) setLoading(false); });
   }, [module, params]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); return () => { requestVersion.current++; }; }, [load]);
 
-  if (err) return <div className="card p-6 text-sm text-red-700">{err}</div>;
+  if (err && !meta) return <div className="card p-6 text-sm text-red-700">{err}</div>;
   if (!meta) return <div className="card"><Loading /></div>;
   const cols = meta.listColumns.filter((c) => !hidden.has(c.name) && c.name !== fk?.column);
   const pages = Math.max(1, Math.ceil((data?.total || 0) / pageSize));
@@ -84,8 +101,10 @@ export default function DataTable({ module, fk, compact, title, actions, default
         {title && <h3 className="mr-2 text-sm font-bold text-navy">{title}</h3>}
         <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
           <L.Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate2" />
-          <input className="input h-9 pl-8" placeholder={`Search ${meta.label.toLowerCase()}…`} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input aria-label={booleanMode ? 'Boolean search' : 'Search records'} className="input h-9 pl-8" placeholder={booleanMode ? 'Example: (BizTalk OR Azure) AND NOT Java' : `Search ${meta.label.toLowerCase()}…`} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (booleanMode && e.key === 'Enter') { setBooleanApplied(true); setDq(q); setPage(1); } }} />
         </div>
+        {profileList && <button className="btn-outline btn-sm h-9" aria-pressed={booleanMode} onClick={() => setBooleanMode((value) => !value)}>Boolean search</button>}
+        {profileList && booleanMode && <button className="btn-primary btn-sm h-9" onClick={() => { setBooleanApplied(true); setDq(q); setPage(1); }}>Search</button>}
         {(meta.filters.length > 0 || meta.hasCreatedAt) && <button className={clsx('btn-outline btn-sm h-9', activeFilters && 'border-navy')} onClick={() => setShowFilters((s) => !s)}><L.SlidersHorizontal className="h-3.5 w-3.5" /> Filters{activeFilters ? ` (${activeFilters})` : ''}</button>}
         {meta.softDelete && meta.can.restore && <button className={clsx('btn-outline btn-sm h-9', archived && 'bg-navy text-white hover:bg-navy-700')} onClick={() => { setArchived((a) => !a); setPage(1); }}><L.Archive className="h-3.5 w-3.5" /> {archived ? 'Showing archived' : 'Archived'}</button>}
         <div className="ml-auto flex items-center gap-2">
@@ -107,51 +126,66 @@ export default function DataTable({ module, fk, compact, title, actions, default
           {meta.can.add && !archived && <Link href={newHref} className="btn-primary btn-sm h-9"><L.Plus className="h-4 w-4" /> New {meta.singular.toLowerCase()}</Link>}
         </div>
       </div>
+      {err && <div role="alert" className="border-b border-red-200 px-4 py-3 text-sm text-red-700">{err}</div>}
       {showFilters && (
         <div className="grid gap-3 border-b border-[#E6EBF4] bg-[#F8FAFD] px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
           {meta.filters.map((f) => (
             <div key={f.name}><label className="label">{f.label}</label>
-              {f.lookup ? <LookupSelect lookup={f.lookup} value={filters[f.name] || ''} onChange={(v) => { setFilters((x) => ({ ...x, [f.name]: v })); setPage(1); }} placeholder="Any" />
-                : <input className="input" value={filters[f.name] || ''} onChange={(e) => { setFilters((x) => ({ ...x, [f.name]: e.target.value })); setPage(1); }} />}
+              {f.lookup ? <LookupSelect lookup={f.lookup} multi={f.multi} value={filterValues[f.name] || ''} onChange={(v) => updateFilter(f.name, v)} placeholder="Any" />
+                : <input className="input" placeholder={f.name === 'designationKeyword' ? 'BizTalk / Azure' : undefined} value={filterValues[f.name] || ''} onChange={(e) => updateFilter(f.name, e.target.value)} />}
             </div>
           ))}
           {meta.hasCreatedAt && <>
-            <div><label className="label">Added from</label><input type="date" className="input" value={filters.created_at__from || ''} onChange={(e) => setFilters((x) => ({ ...x, created_at__from: e.target.value }))} /></div>
-            <div><label className="label">Added to</label><input type="date" className="input" value={filters.created_at__to || ''} onChange={(e) => setFilters((x) => ({ ...x, created_at__to: e.target.value }))} /></div>
+            <div><label className="label">Added from</label><input type="date" className="input" value={filterValues.created_at__from || ''} onChange={(e) => updateFilter('created_at__from', e.target.value)} /></div>
+            <div><label className="label">Added to</label><input type="date" className="input" value={filterValues.created_at__to || ''} onChange={(e) => updateFilter('created_at__to', e.target.value)} /></div>
           </>}
-          <div className="flex items-end"><button className="btn-ghost btn-sm" onClick={() => setFilters({})}>Clear filters</button></div>
+          <div className="flex items-end gap-2">
+            {profileList && <button className="btn-primary btn-sm" onClick={() => { setFilters(draftFilters); setPage(1); }}>Apply filters</button>}
+            <button className="btn-ghost btn-sm" onClick={() => { setDraftFilters({}); setFilters({}); setPage(1); }}>Clear filters</button>
+          </div>
         </div>
       )}
-      <div className="relative overflow-x-auto">
-        {loading && <div className="absolute inset-0 z-10 bg-white/50" />}
-        {data && data.rows.length === 0 && !loading ? (
-          <Empty title={archived ? 'Nothing archived' : `No ${meta.label.toLowerCase()} yet`} text={dq || activeFilters ? 'Try a different search or clear the filters.' : undefined}
-            action={meta.can.add && !archived && !dq ? <Link href={newHref} className="btn-primary btn-sm"><L.Plus className="h-4 w-4" /> New {meta.singular.toLowerCase()}</Link> : undefined} />
-        ) : !data ? <Loading /> : (
-          <table className="w-full min-w-[720px]">
-            <thead className="bg-[#F8FAFD]"><tr>
-              {(meta.can.delete || meta.can.restore) && <th className="th w-8"><input type="checkbox" checked={sel.size > 0 && sel.size === data.rows.length} onChange={(e) => setSel(e.target.checked ? new Set(data.rows.map((r) => String(r[meta.pk]))) : new Set())} /></th>}
-              {cols.map((c) => (
-                <th key={c.name} className="th cursor-pointer select-none hover:text-navy" onClick={() => setSort((s) => (s?.c === c.name ? { c: c.name, d: s.d === 'asc' ? 'desc' : 'asc' } : { c: c.name, d: 'desc' }))}>
-                  <span className="inline-flex items-center gap-1">{c.name === meta.pk ? 'ID' : c.label}{sort?.c === c.name && (sort.d === 'asc' ? <L.ArrowUp className="h-3 w-3" /> : <L.ArrowDown className="h-3 w-3" />)}</span>
-                </th>
-              ))}
-            </tr></thead>
-            <tbody className="divide-y divide-[#EEF2F8]">
-              {data.rows.map((r) => {
-                const id = String(r[meta.pk]);
-                return (
-                  <tr key={id} className="cursor-pointer hover:bg-[#F8FAFD]" onClick={() => router.push(`${base}/${id}`)}>
-                    {(meta.can.delete || meta.can.restore) && <td className="td" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(id)} onChange={(e) => { const s = new Set(sel); e.target.checked ? s.add(id) : s.delete(id); setSel(s); }} /></td>}
-                    {cols.map((c) => (
-                      <td key={c.name} className={clsx('td max-w-[280px]', c.name === meta.titleField && 'font-semibold text-navy', c.name === meta.pk && 'text-xs font-mono text-slate2')}><Cell row={r} col={c.name} kind={c.kind} module={module} pk={meta.pk} /></td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+      <div className={clsx('relative', loading && 'min-h-36')}>
+        <div role="status" aria-live="polite" aria-atomic="true" className={loading ? 'pointer-events-none absolute inset-0 z-10 flex items-start justify-center bg-white/80 px-4 py-6' : 'sr-only'}>
+          {loading && (
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-[#E6EBF4] bg-white px-5 py-3 shadow-sm">
+              <img src="/brand/atlis-cloud_logo_horizontal_navy.svg" alt="" width={128} height={30} className="h-7 w-32 object-contain motion-safe:animate-pulse" />
+              <span className="text-sm font-medium text-navy">Loading results…</span>
+            </div>
+          )}
+        </div>
+        <div className="overflow-x-auto" aria-busy={loading}>
+          {data && data.rows.length === 0 && !loading ? (
+            <Empty title={archived ? 'Nothing archived' : `No ${meta.label.toLowerCase()} yet`} text={dq || activeFilters ? 'Try a different search or clear the filters.' : undefined}
+              action={meta.can.add && !archived && !dq ? <Link href={newHref} className="btn-primary btn-sm"><L.Plus className="h-4 w-4" /> New {meta.singular.toLowerCase()}</Link> : undefined} />
+          ) : !data ? null : (
+            <table className="w-full min-w-[720px]">
+              <thead className="bg-[#F8FAFD]"><tr>
+                {(meta.can.delete || meta.can.restore) && <th className="th w-8"><input type="checkbox" checked={sel.size > 0 && sel.size === data.rows.length} onChange={(e) => setSel(e.target.checked ? new Set(data.rows.map((r) => String(r[meta.pk]))) : new Set())} /></th>}
+                {cols.map((c) => (
+                  <th key={c.name} className="th cursor-pointer select-none hover:text-navy" onClick={() => setSort((s) => (s?.c === c.name ? { c: c.name, d: s.d === 'asc' ? 'desc' : 'asc' } : { c: c.name, d: 'desc' }))}>
+                    <span className="inline-flex items-center gap-1">{c.name === meta.pk ? 'ID' : c.label}{sort?.c === c.name && (sort.d === 'asc' ? <L.ArrowUp className="h-3 w-3" /> : <L.ArrowDown className="h-3 w-3" />)}</span>
+                  </th>
+                ))}
+                {newTab && <th className="th">Actions</th>}
+              </tr></thead>
+              <tbody className="divide-y divide-[#EEF2F8]">
+                {data.rows.map((r) => {
+                  const id = String(r[meta.pk]);
+                  return (
+                    <tr key={id} className="cursor-pointer hover:bg-[#F8FAFD]" onClick={() => router.push(`${base}/${id}`)}>
+                      {(meta.can.delete || meta.can.restore) && <td className="td" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(id)} onChange={(e) => { const s = new Set(sel); e.target.checked ? s.add(id) : s.delete(id); setSel(s); }} /></td>}
+                      {cols.map((c) => (
+                        <td key={c.name} className={clsx('td max-w-[280px]', c.name === meta.titleField && 'font-semibold text-navy', c.name === meta.pk && 'text-xs font-mono text-slate2')}><Cell row={r} col={c.name} kind={c.kind} module={module} pk={meta.pk} /></td>
+                      ))}
+                      {newTab && <td className="td"><a href={base + '/' + id} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap text-navy underline" onClick={(e) => e.stopPropagation()}>Open in new tab</a></td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
       {data && data.total > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#E6EBF4] px-4 py-2.5 text-xs text-slate2">

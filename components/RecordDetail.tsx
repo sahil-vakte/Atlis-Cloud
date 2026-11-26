@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { api, fileUrl } from '@/lib/client';
 import DataTable, { Cell, loadMeta, type Meta } from './DataTable';
 import { Loading, PageHeader, useConfirm, useToast } from './ui';
+import McpSetupPanel, { type McpClientDetails } from './McpSetupPanel';
 import ModuleActions, { ExtraTabs } from './ModuleActions';
 
 export default function RecordDetail({ module, id }: { module: string; id: string }) {
@@ -14,14 +15,16 @@ export default function RecordDetail({ module, id }: { module: string; id: strin
   const toast = useToast();
   const { confirm, node } = useConfirm();
   const [meta, setMeta] = useState<Meta | null>(null);
-  const [row, setRow] = useState<any>(null);
+  const [record, setRow] = useState<any>(null);
   const [err, setErr] = useState('');
+  const [mcpSetup, setMcpSetup] = useState<{ userId: string; client: McpClientDetails | null } | null>(null);
   const [tab, setTab] = useState('overview');
   const load = useCallback(() => api(`/api/m/${module}/${id}`).then(setRow).catch((e) => setErr(e.message)), [module, id]);
   useEffect(() => { loadMeta(module).then(setMeta).catch((e) => setErr(e.message)); load(); }, [module, load]);
 
   if (err) return <div className="card p-6 text-sm text-red-700">{err} <Link href={`/m/${module}`} className="ml-2 underline">Back to list</Link></div>;
-  if (!meta || !row) return <Loading />;
+  if (!meta || !record) return <Loading />;
+  const row = { ...record, ...record.__display };
   const archived = meta.softDelete && (Number(row.deleted) === 1 || Number(row.is_deleted) === 1);
   const fieldBy = Object.fromEntries(meta.fields.map((f: any) => [f.name, f]));
   const title = row[meta.titleField] || `${meta.singular} #${id}`;
@@ -40,7 +43,7 @@ export default function RecordDetail({ module, id }: { module: string; id: strin
       <PageHeader crumbs={<Link href={`/m/${module}`} className="hover:underline">{meta.label}</Link>} title={<span className="flex items-center gap-3">{title}{archived && <span className="badge bg-amber-50 text-amber-700">Archived</span>}</span>}
         sub={<span className="font-mono text-xs">#{id}</span>}
         actions={<>
-          <ModuleActions module={module} row={row} reload={load} />
+          <ModuleActions module={module} row={row} reload={load} onMcpSetup={(client) => setMcpSetup({ userId: id, client })} />
           {meta.can.edit && !archived && <Link href={`/m/${module}/${id}/edit`} className="btn-primary"><L.Pencil className="h-4 w-4" /> Edit</Link>}
           {archived ? meta.can.restore && <button className="btn-outline" onClick={restore}><L.ArchiveRestore className="h-4 w-4" /> Restore</button>
             : meta.can.delete && <button className="btn-outline text-red-700" onClick={remove}><L.Trash2 className="h-4 w-4" /> {meta.softDelete ? 'Archive' : 'Delete'}</button>}
@@ -56,6 +59,7 @@ export default function RecordDetail({ module, id }: { module: string; id: strin
               if ((k === 'date' || k === 'datetime') && /^(0000|1970-01-0[12])/.test(String(v))) return true;
               return k === 'number' && String(v) === '0' && !/(status|count|rate|amount|positions)/i.test(n); };
             const fields = s.fields.filter((n) => !empty(n));
+            if (s.title === 'Engagement' && row.engagementClient) fields.push('engagementClient');
             if (!fields.length) return null;
             return (
               <section key={s.title} className="card p-5">
@@ -65,7 +69,7 @@ export default function RecordDetail({ module, id }: { module: string; id: strin
                     const f = fieldBy[n]; const wide = f && ['textarea', 'richtext'].includes(f.kind);
                     return (
                       <div key={n} className={clsx(wide && 'sm:col-span-2 xl:col-span-3')}>
-                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate2">{f?.label || n}</dt>
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate2">{f?.label || (n === 'engagementClient' ? 'Client' : n)}</dt>
                         <dd className="mt-0.5 text-sm text-[#0B1B3F]">
                           {f?.kind === 'richtext' ? <div className="rich max-w-none" dangerouslySetInnerHTML={{ __html: sanitize(String(row[n])) }} />
                             : f?.kind === 'textarea' ? <p className="whitespace-pre-wrap">{String(row[n])}</p>
@@ -79,6 +83,7 @@ export default function RecordDetail({ module, id }: { module: string; id: strin
               </section>
             );
           })}
+          {module === 'users' && row.__mcp?.enabled && <McpSetupPanel key={id} userId={id} setup={row.__mcp} issued={mcpSetup?.userId === id ? mcpSetup.client : null} />}
           <p className="text-xs text-slate2">{row.created_at && `Created ${String(row.created_at).slice(0, 16)}`}{row.updated_at && ` · Updated ${String(row.updated_at).slice(0, 16)}`}</p>
         </div>
       )}

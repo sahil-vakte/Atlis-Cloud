@@ -11,7 +11,7 @@
     "rebrand-db": "node scripts/rebrand-db.mjs",
     "test:cv": "tsx scripts/test-cv-parser.mts tests/cv-samples && tsx scripts/test-cv-parser.mts tests/cv-samples-blind",
     "migrate": "node scripts/migrate.mjs",
-    "test:email": "tsx --test tests/email-routing.test.ts tests/navigation.test.ts",
+    "test:email": "tsx --test tests/email-routing.test.ts tests/navigation.test.ts tests/template-content.test.ts",
     "typecheck": "tsc --noEmit",
     "notifications:discover": "tsx scripts/discover-email-routes.mts",
     "test:auth": "tsx --test tests/totp.test.ts",
@@ -19,6 +19,7 @@
     "test:cv-scale": "node --max-old-space-size=256 --import tsx scripts/test-cv-scale.mts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1175.0",
     "@napi-rs/canvas": "^1.1.1",
     "@tesseract.js-data/eng": "^1.0.0",
     "bcryptjs": "^3.0.3",

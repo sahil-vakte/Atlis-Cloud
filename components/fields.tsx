@@ -11,7 +11,7 @@ type Opt = { value: string; label: string };
 const optCache = new Map<string, Promise<Opt[]>>();
 export function loadOptions(lookup: string, q = '', ids?: string[]) {
   const key = `${lookup}|${q}|${ids?.join(',') || ''}`;
-  if (!optCache.has(key)) optCache.set(key, api<Opt[]>(`/api/lookup/${encodeURIComponent(lookup)}?limit=${q ? 50 : 200}&q=${encodeURIComponent(q)}${ids?.length ? `&ids=${ids.join(',')}` : ''}`).catch(() => []));
+  if (!optCache.has(key)) optCache.set(key, api<Opt[]>(`/api/lookup/${encodeURIComponent(lookup)}?limit=${q ? 50 : 200}&q=${encodeURIComponent(q)}${ids?.length ? `&ids=${ids.join(',')}` : ''}`).catch(() => { optCache.delete(key); return []; }));
   return optCache.get(key)!;
 }
 
@@ -30,9 +30,10 @@ export function LookupSelect({ lookup, value, onChange, multi, placeholder, disa
   }, [selected.join(','), lookup]); // eslint-disable-line
   useEffect(() => {
     if (!open) return;
+    let active = true;
     setLoading(true);
-    const t = setTimeout(() => loadOptions(lookup, q).then((r) => { setOpts(r); setKnown((k) => ({ ...k, ...Object.fromEntries(r.map((o) => [String(o.value), o.label])) })); setLoading(false); }), q ? 200 : 0);
-    return () => clearTimeout(t);
+    const t = setTimeout(() => loadOptions(lookup, q).then((r) => { if (!active) return; setOpts(r); setKnown((k) => ({ ...k, ...Object.fromEntries(r.map((o) => [String(o.value), o.label])) })); setLoading(false); }), q ? 200 : 0);
+    return () => { active = false; clearTimeout(t); };
   }, [open, q, lookup]);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };

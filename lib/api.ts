@@ -16,7 +16,7 @@ export function handler<C = any>(fn: (req: Request, ctx: C, user: SessionUser) =
     } catch (e: any) {
       if (e?.digest === 'DYNAMIC_SERVER_USAGE' || e?.digest?.startsWith?.('NEXT_')) throw e;
       if (e instanceof HttpError) return fail(e.status, e.message);
-      if (e?.status === 403) return fail(403, e.message);
+      if (e?.status === 400 || e?.status === 403) return fail(e.status, e.message);
       console.error(e);
       return fail(500, e?.sqlMessage || e?.message || 'Unexpected error');
     }
@@ -39,6 +39,7 @@ export function listParams(url: URL) {
     page: Number(url.searchParams.get('page') || 1),
     pageSize: Number(url.searchParams.get('pageSize') || 25),
     q: url.searchParams.get('q') || '',
+    booleanSearch: url.searchParams.get('boolean') === '1',
     sort: url.searchParams.get('sort') || undefined,
     dir: (url.searchParams.get('dir') as 'asc' | 'desc') || undefined,
     archived: url.searchParams.get('archived') === '1',

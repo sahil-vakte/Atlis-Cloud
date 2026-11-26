@@ -30,7 +30,7 @@ export async function moduleMeta(m: ModuleDef, user: SessionUser) {
   const t = getTable(m.table);
   const fields: FieldMeta[] = formColumnsFor(m).map((c) => ({
     name: c.name, label: humanize(c.name), kind: fieldKind(m, c), lookup: m.lookups?.[c.name], enumValues: c.enumValues,
-    required: !c.nullable && c.default == null && !c.autoIncrement && c.name === m.titleField, maxLength: c.length,
+    required: c.name === m.titleField && (m.key === 'profiles' || (!c.nullable && c.default == null && !c.autoIncrement)), maxLength: c.length,
   }));
   const names = new Set(fields.map((f) => f.name));
   let sections = (m.formSections || []).map((s) => ({ title: s.title, fields: s.fields.filter((f) => names.has(f)) })).filter((s) => s.fields.length);
@@ -42,7 +42,10 @@ export async function moduleMeta(m: ModuleDef, user: SessionUser) {
   return {
     key: m.key, label: m.label, singular: m.singular, group: m.group, pk: t.pk, titleField: m.titleField,
     listColumns: listCols.map((c) => ({ name: c, label: humanize(c), kind: columnKinds[c] })),
-    filters: (m.filters || []).filter((f) => t.columns.some((c) => c.name === f)).map((f) => ({ name: f, label: humanize(f), lookup: m.lookups?.[f] })),
+    filters: [
+      ...(m.filters || []).filter((f) => t.columns.some((c) => c.name === f)).map((f) => ({ name: f, label: humanize(f), lookup: m.lookups?.[f], multi: m.key === 'profiles' && f === 'skillset' })),
+      ...(m.key === 'profiles' ? [{ name: 'designationKeyword', label: 'Designation keywords (incl. CV)' }] : []),
+    ],
     hasCreatedAt: t.columns.some((c) => c.name === 'created_at'),
     fields, sections, softDelete: !!m.softDelete,
     related: (m.related || []).filter((r) => MODULE_MAP[r.module]).map((r) => ({ ...r, label: r.label || MODULE_MAP[r.module].label })),
